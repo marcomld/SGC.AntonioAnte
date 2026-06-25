@@ -1,0 +1,6 @@
+@SGC.AntonioAnte.API_HostAddress = http://localhost:5069
+
+GET {{SGC.AntonioAnte.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
