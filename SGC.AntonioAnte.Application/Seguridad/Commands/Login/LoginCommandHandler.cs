@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using SGC.AntonioAnte.Application.Common.Exceptions;
 using SGC.AntonioAnte.Application.Common.Interfaces;
 using SGC.AntonioAnte.Domain.Entities;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad;
@@ -34,40 +35,52 @@ namespace SGC.AntonioAnte.Application.Seguridad.Commands.Login
         {
             var usuario = await _userManager.FindByNameAsync(request.Identificacion);
 
-            // 1. Validar existencia
             if (usuario == null)
             {
-                // SOLUCIÓN: Pasamos _currentUserService.IpAddress y UserAgent en lugar de request
                 await RegistrarAuditoria(null, "LOGIN_FALLIDO", "Usuario", null, "Usuario no encontrado", _currentUserService.IpAddress, _currentUserService.UserAgent, cancellationToken);
                 throw new Exception("Credenciales inválidas.");
             }
 
-            // 2. Validar Estado Activo
             if (!usuario.EstadoActivo)
             {
                 await RegistrarAuditoria(usuario.Id, "LOGIN_RECHAZADO", "Usuario", usuario.Id.ToString(), "Cuenta inactiva", _currentUserService.IpAddress, _currentUserService.UserAgent, cancellationToken);
                 throw new Exception("El usuario se encuentra inactivo en el sistema.");
             }
 
-            // 3. Validar Bloqueos
+            // 1. CONTROL DE LOCKOUT EXISTENTE PRE-LOGIN
             if (await _userManager.IsLockedOutAsync(usuario))
             {
-                await RegistrarAuditoria(usuario.Id, "CUENTA_BLOQUEADA", "Usuario", usuario.Id.ToString(), "Demasiados intentos fallidos", _currentUserService.IpAddress, _currentUserService.UserAgent, cancellationToken);
-                throw new Exception("Su cuenta ha sido bloqueada temporalmente por seguridad. Intente de nuevo más tarde.");
+                var fechaFinBloqueo = usuario.LockoutEnd ?? DateTimeOffset.UtcNow;
+                var segundosRestantes = Math.Max(0, (int)(fechaFinBloqueo - DateTimeOffset.UtcNow).TotalSeconds);
+
+                await RegistrarAuditoria(usuario.Id, "CUENTA_BLOQUEADA_CONSULTA", "Usuario", usuario.Id.ToString(), $"Intento de acceso en cuenta penalizada. Segundos restantes: {segundosRestantes}", _currentUserService.IpAddress, _currentUserService.UserAgent, cancellationToken);
+
+                throw new LoginBloqueadoException(segundosRestantes);
             }
 
-            // 4. Validar Contraseña
+            // 2. VALIDAR CONTRASEÑA CON LOCKOUT ACTIVADO
             if (!await _userManager.CheckPasswordAsync(usuario, request.Password))
             {
                 await _userManager.AccessFailedAsync(usuario);
+
+                // Verificar si este fallo causó un nuevo bloqueo inmediato
+                if (await _userManager.IsLockedOutAsync(usuario))
+                {
+                    var fechaFinBloqueo = usuario.LockoutEnd ?? DateTimeOffset.UtcNow.AddMinutes(15);
+                    var segundosRestantes = Math.Max(0, (int)(fechaFinBloqueo - DateTimeOffset.UtcNow).TotalSeconds);
+
+                    await RegistrarAuditoria(usuario.Id, "CUENTA_BLOQUEADA", "Usuario", usuario.Id.ToString(), "Límite de intentos alcanzado. Cuenta penalizada.", _currentUserService.IpAddress, _currentUserService.UserAgent, cancellationToken);
+
+                    throw new LoginBloqueadoException(segundosRestantes);
+                }
+
                 await RegistrarAuditoria(usuario.Id, "LOGIN_FALLIDO", "Usuario", usuario.Id.ToString(), "Contraseña incorrecta", _currentUserService.IpAddress, _currentUserService.UserAgent, cancellationToken);
                 throw new Exception("Credenciales inválidas.");
             }
 
-            // Login exitoso: reiniciar contador
             await _userManager.ResetAccessFailedCountAsync(usuario);
 
-            // --- Generación de Claims ---
+            // --- Generación de Claims y Tokens ---
             var roles = await _userManager.GetRolesAsync(usuario);
             var claims = new List<Claim>
             {
@@ -83,7 +96,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Commands.Login
                 claims.Add(new Claim(ClaimTypes.Role, rol));
             }
 
-            // --- Nueva lógica de Tokens ---
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JwtSettings:Key"]!));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
@@ -96,20 +108,15 @@ namespace SGC.AntonioAnte.Application.Seguridad.Commands.Login
             );
 
             var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
-
-            // Generar el Refresh Token
             var randomNumber = new byte[32];
             using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
             rng.GetBytes(randomNumber);
             var refreshTokenString = Convert.ToBase64String(randomNumber);
-
             var refreshTokenValue = $"{refreshTokenString}|{DateTime.UtcNow.AddDays(7):O}";
 
-            // Guardar en la tabla Seguridad.UsuarioTokens
             await _userManager.RemoveAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken");
             await _userManager.SetAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken", refreshTokenValue);
 
-            // 4. Registrar Éxito (CORREGIDO AQUÍ TAMBIÉN)
             await RegistrarAuditoria(usuario.Id, "LOGIN_EXITOSO", "Usuario", usuario.Id.ToString(), "Generación de Access y Refresh Token", _currentUserService.IpAddress, _currentUserService.UserAgent, cancellationToken);
 
             return new TokenResponseDto
@@ -119,7 +126,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Commands.Login
             };
         }
 
-        // El método privado se queda exactamente como lo pidió el arquitecto (recibe strings)
         private async Task RegistrarAuditoria(Guid? usuarioId, string accion, string entidad, string? entidadId, string datosAdicionales, string ipAddress, string userAgent, CancellationToken cancellationToken)
         {
             var auditoria = new Auditoria
@@ -133,7 +139,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Commands.Login
                 Navegador = userAgent,
                 FechaCreacion = DateTime.UtcNow
             };
-
             _context.Auditorias.Add(auditoria);
             await _context.SaveChangesAsync(cancellationToken);
         }

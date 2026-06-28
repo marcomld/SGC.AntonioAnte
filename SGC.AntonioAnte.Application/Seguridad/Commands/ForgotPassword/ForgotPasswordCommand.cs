@@ -7,7 +7,8 @@ using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Application.Seguridad.Commands.ForgotPassword
 {
-    public class ForgotPasswordCommand : IRequest<String>
+    // Cambiado a bool por el ajuste de seguridad
+    public class ForgotPasswordCommand : IRequest<bool>
     {
         public string Email { get; set; } = string.Empty;
     }

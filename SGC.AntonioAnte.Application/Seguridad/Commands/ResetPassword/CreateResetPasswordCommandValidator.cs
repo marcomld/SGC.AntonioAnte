@@ -16,7 +16,8 @@ namespace SGC.AntonioAnte.Application.Seguridad.Commands.ResetPassword
                 .EmailAddress().WithMessage("El formato del correo electrónico no es válido.");
 
             RuleFor(v => v.Token)
-                .NotEmpty().WithMessage("El token de seguridad es obligatorio.");
+                .NotEmpty().WithMessage("El código de verificación (OTP) es obligatorio.")
+                .Length(6).WithMessage("El código de verificación (OTP) debe contener exactamente 6 dígitos.");
 
             RuleFor(v => v.NuevaPassword)
                 .NotEmpty().WithMessage("La nueva contraseña es obligatoria.")

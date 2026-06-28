@@ -15,7 +15,6 @@ using System.Threading.Tasks;
 namespace SGC.AntonioAnte.API.Controllers
 {
     [ApiController]
-    // ESTÁNDAR: Versión explícita v1, minúsculas y kebab-case unificado
     [Route("api/v1/seguridad/usuarios")]
     public class UsuariosController : ControllerBase
     {
@@ -97,8 +96,9 @@ namespace SGC.AntonioAnte.API.Controllers
                 Email = dto.Email
             };
 
-            var tokenGenerado = await _mediator.Send(command);
-            return Ok(new { Token = tokenGenerado, Mensaje = "Token de recuperación generado correctamente." });
+            // Ejecuta el envío y audita internamente sin retornar el código OTP en el JSON
+            await _mediator.Send(command);
+            return Ok(new { Mensaje = "Código de verificación (OTP) enviado exitosamente al correo electrónico institucional." });
         }
 
         [HttpPost("restablecer-password")]
@@ -107,7 +107,7 @@ namespace SGC.AntonioAnte.API.Controllers
             var command = new ResetPasswordCommand
             {
                 Email = dto.Email,
-                Token = dto.Token,
+                Token = dto.Token, // El cliente Blazor mandará los 6 dígitos aquí
                 NuevaPassword = dto.NuevaPassword
             };
 
@@ -115,14 +115,12 @@ namespace SGC.AntonioAnte.API.Controllers
             return Ok(new { Mensaje = "Contraseña restablecida exitosamente." });
         }
 
-        // SEMÁNTICA REST PURA: POST a un sub-recurso específico identificado por su GUID
-        // Mitiga OWASP BOLA y elimina verbos de la URL
         [HttpPost("{id}/permisos")]
         public async Task<IActionResult> AsignarPermisoGranular([FromRoute] Guid id, [FromBody] AddClaimDto dto)
         {
             var command = new AddClaimCommand
             {
-                UsuarioId = id, // Tomamos el ID directamente de la ruta segura de la URL
+                UsuarioId = id,
                 ClaimType = dto.TipoClaim,
                 ClaimValue = dto.ValorClaim
             };

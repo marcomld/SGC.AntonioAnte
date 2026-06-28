@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using SGC.AntonioAnte.Application.Common.Interfaces;
 using SGC.AntonioAnte.Domain.Entities;
 using SGC.AntonioAnte.Infrastructure.Persistence;
+using SGC.AntonioAnte.Infrastructure.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -41,6 +42,12 @@ namespace SGC.AntonioAnte.Infrastructure
                 // Prevención de ataques de fuerza bruta
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
                 options.Lockout.MaxFailedAccessAttempts = 5;
+
+                // =========================================================================
+                // ARQUITECTURA: FORZAR TOKEN DE 6 DÍGITOS PARA RESTABLECER CONTRASEÑA
+                // =========================================================================
+                options.Tokens.PasswordResetTokenProvider = TokenOptions.DefaultEmailProvider;
+                // =========================================================================
             })
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
@@ -69,6 +76,8 @@ namespace SGC.AntonioAnte.Infrastructure
 
 
             services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
+
+            services.AddTransient<IEmailService, EmailService>();
 
             return services;
         }

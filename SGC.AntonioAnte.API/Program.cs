@@ -57,6 +57,18 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>(); // Regist
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("PoliticaBlazorSGC", policy =>
+    {
+        policy.WithOrigins("https://localhost:7004") // El puerto exacto de tu cliente Blazor
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials(); // Permite el transporte seguro de cookies/cabeceras si fuera necesario
+    });
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -73,6 +85,11 @@ app.UseExceptionHandler();
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
+
+app.UseRouting();
+
+// AQUÍ AGREGAS LA LÍNEA:
+app.UseCors("PoliticaBlazorSGC");
 
 app.UseAuthorization();
 
