@@ -6,9 +6,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using SGC.AntonioAnte.Application.Common.Interfaces;
-using SGC.AntonioAnte.Domain.Entities;
+using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using SGC.AntonioAnte.Infrastructure.Persistence;
-using SGC.AntonioAnte.Infrastructure.Services;
+using SGC.AntonioAnte.Infrastructure.Services.Seguridad;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,12 +21,23 @@ namespace SGC.AntonioAnte.Infrastructure
     {
         public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
         {
-            // 1. Configuración del DbContext con SQL Server
+            // 1. Configuración del DbContext con SQL Server y Resiliencia
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(
                     configuration.GetConnectionString("DefaultConnection"),
-                    b => b.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
-                    // Nota del Arquitecto: Aquí integraremos NetTopologySuite cuando pasemos al Módulo de Catastros (GIS)
+                    builder =>
+                    {
+                        builder.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
+
+                        // Habilitar resiliencia ante fallos transitorios (Recomendado para Azure SQL)
+                        builder.EnableRetryOnFailure(
+                            maxRetryCount: 5, // Número máximo de reintentos
+                            maxRetryDelay: TimeSpan.FromSeconds(30), // Tiempo máximo de espera entre fallos
+                            errorNumbersToAdd: null);
+
+                        // Soporte para geometrías espacial/GIS (Puntos, Polígonos de Predios)
+                        builder.UseNetTopologySuite();
+                    }
                 ));
 
             // 2. Configuración de ASP.NET Core Identity (Nuestras entidades personalizadas)

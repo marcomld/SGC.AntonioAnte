@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using SGC.AntonioAnte.Application.Common.Exceptions;
 using SGC.AntonioAnte.Application.Common.Interfaces;
-using SGC.AntonioAnte.Domain.Entities;
+using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad;
 using System;
 using System.Collections.Generic;

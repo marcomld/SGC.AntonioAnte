@@ -1,0 +1,186 @@
+﻿@page "/seguridad/registrar-usuario"
+@attribute [Authorize(Roles = "AdminSistemas")]
+@using SGC.AntonioAnte.Shared.DTOs.Seguridad
+@using SGC.AntonioAnte.Client.Services.Seguridad.Contracts
+@using Microsoft.AspNetCore.Authorization
+@inject IUsuarioService UsuarioService
+@inject NavigationManager Navigation
+
+<div class="container py-4 animate-fade-in" style="max-width: 680px;">
+    <div class="mb-3">
+        <a href="seguridad/usuarios" class="text-decoration-none small text-muted fw-semibold">
+            <i class="bi bi-arrow-left"></i> Regresar a la nómina
+        </a>
+    </div>
+
+    <div class="login-card shadow-lg bg-white w-100">
+        <div class="card-accent-bar" style="height: 4px; background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);"></div>
+        <div class="p-4 p-md-5">
+            <div class="text-center mb-4">
+                <div class="mb-3 d-inline-block p-3 rounded-circle bg-primary bg-opacity-10 text-primary">
+                    <i class="bi bi-person-plus-fill fs-3"></i>
+                </div>
+                <h3 class="fw-bold text-dark">Alta de Funcionario</h3>
+                <p class="text-muted small">Crea un registro de usuario enlazado a las políticas de acceso del GAD.</p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMensaje))
+            {
+                <div class="alert alert-danger border-0 shadow-sm small mb-4" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> @errorMensaje
+                </div>
+            }
+
+            <EditForm Model="@nuevoUsuario" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            <InputText id="txtCedula" class="form-control" placeholder="100xxxxxxx" @bind-Value="nuevoUsuario.Identificacion" maxlength="10" />
+                            <label for="txtCedula">Identificación (Cédula)</label>
+                            <ValidationMessage For="@(() => nuevoUsuario.Identificacion)" class="text-danger small mt-1" />
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            <InputText id="txtEmail" class="form-control" placeholder="nombre@antonioante.gob.ec" @bind-Value="nuevoUsuario.Email" />
+                            <label for="txtEmail">Correo Institucional</label>
+                            <ValidationMessage For="@(() => nuevoUsuario.Email)" class="text-danger small mt-1" />
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            <InputText id="txtNombres" class="form-control" placeholder="Nombres" @bind-Value="nuevoUsuario.Nombres" />
+                            <label for="txtNombres">Nombres Completos</label>
+                            <ValidationMessage For="@(() => nuevoUsuario.Nombres)" class="text-danger small mt-1" />
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            <InputText id="txtApellidos" class="form-control" placeholder="Apellidos" @bind-Value="nuevoUsuario.Apellidos" />
+                            <label for="txtApellidos">Apellidos Completos</label>
+                            <ValidationMessage For="@(() => nuevoUsuario.Apellidos)" class="text-danger small mt-1" />
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            <InputSelect id="ddlDepartamento" class="form-select" @bind-Value="nuevoUsuario.Departamento">
+                                <option value="">-- Seleccionar --</option>
+                                <option value="Avalúos y Catastros">Avalúos y Catastros</option>
+                                <option value="Sistemas e Informática">Sistemas e Informática</option>
+                                <option value="Planificación Urbana">Planificación Urbana</option>
+                                <option value="Financiero / Rentas">Financiero / Rentas</option>
+                            </InputSelect>
+                            <label for="ddlDepartamento">Departamento Municipal</label>
+                            <ValidationMessage For="@(() => nuevoUsuario.Departamento)" class="text-danger small mt-1" />
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-floating">
+                            <InputSelect id="ddlRol" class="form-select" @bind-Value="nuevoUsuario.RolAsignado">
+                                <option value="">-- Seleccionar --</option>
+                                <option value="AdminSistemas">Administrador del Sistema</option>
+                                <option value="JefeCatastro">Jefe de Avalúos y Catastros</option>
+                                <option value="DigitadorCatastral">Digitador / Técnico de Campo</option>
+                                <option value="ConsultorConsultas">Consultor Institucional</option>
+                            </InputSelect>
+                            <label for="ddlRol">Rol de Seguridad Base</label>
+                            <ValidationMessage For="@(() => nuevoUsuario.RolAsignado)" class="text-danger small mt-1" />
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-floating position-relative">
+                            <InputText type="@(verPassword ? "text" : "password")" id="txtPassword" class="form-control" placeholder="Password" @bind-Value="nuevoUsuario.Password" />
+                            <label for="txtPassword">Contraseña Inicial Temporal</label>
+                            <button type="button" class="btn btn-link position-absolute end-0 top-0 mt-2 me-2 text-muted z-3 text-decoration-none" @onclick="ToggleVerPassword" tabindex="-1" style="box-shadow: none;">
+                                <i class="bi @(verPassword ? "bi-eye-slash-fill" : "bi-eye-fill")"></i>
+                            </button>
+                            <ValidationMessage For="@(() => nuevoUsuario.Password)" class="text-danger small mt-1" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg shadow-hover fw-semibold" disabled="@procesando">
+                        @if (procesando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span> <span>Registrando Funcionario...</span>
+                        }
+                        else
+                        {
+                            <span><i class="bi bi-save-fill me-1"></i> Confirmar e Insertar Usuario</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+<style>
+    .login-card {
+        background-color: #ffffff;
+        border-radius: 1rem;
+        overflow: hidden;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .card-accent-bar {
+        height: 4px;
+        width: 100%;
+        background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+    }
+</style>
+
+@code {
+    private CreateUsuarioDto nuevoUsuario = new();
+    private string errorMensaje = string.Empty;
+    private bool procesando = false;
+    private bool verPassword = false;
+
+    private void ToggleVerPassword() => verPassword = !verPassword;
+
+    private async Task HandleValidSubmit()
+    {
+        procesando = true;
+        errorMensaje = string.Empty;
+
+        try
+        {
+            var resultado = await UsuarioService.RegistrarFuncionarioAsync(nuevoUsuario);
+
+            if (resultado.Exitoso)
+            {
+                Navigation.NavigateTo("seguridad/usuarios");
+            }
+            else
+            {
+                // GARANTIZA MOSTRAR EL MENSAJE DE ERROR O UN FALLBACK SI LLEGA VACÍO
+                errorMensaje = string.IsNullOrWhiteSpace(resultado.Mensaje)
+                    ? "Ocurrió un error no especificado en el servidor al intentar registrar el funcionario."
+                    : resultado.Mensaje;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMensaje = $"Excepción al procesar la solicitud: {ex.Message}";
+        }
+        finally
+        {
+            procesando = false;
+            StateHasChanged(); // Fuerzo el re-renderizado de la UI
+        }
+    }
+}

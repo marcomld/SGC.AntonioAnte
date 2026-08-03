@@ -36,15 +36,20 @@ namespace SGC.AntonioAnte.API.Infrastructure
             {
                 httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
 
+                // Agrupamos los errores por propiedad
                 var errores = validationException.Errors
                     .GroupBy(e => e.PropertyName)
                     .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
 
+                // Extraemos el primer mensaje de error para ponerlo como detalle principal
+                var primerMensajeError = validationException.Errors.FirstOrDefault()?.ErrorMessage
+                                         ?? "Uno o más errores de validación ocurrieron.";
+
                 var problemDetails = new ValidationProblemDetails(errores)
                 {
                     Status = StatusCodes.Status400BadRequest,
-                    Title = "Error en las reglas de negocio.",
-                    Detail = "Uno o más errores de validación ocurrieron."
+                    Title = "Error en las reglas de negocio",
+                    Detail = primerMensajeError // <-- Al poner aquí el mensaje limpio, Blazor lo lee directamente
                 };
 
                 await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken);

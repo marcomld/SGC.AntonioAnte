@@ -1,0 +1,187 @@
+﻿@page "/login"
+@layout AuthLayout
+@using SGC.AntonioAnte.Shared.DTOs.Seguridad
+@using SGC.AntonioAnte.Client.Services.Seguridad.Contracts
+@using SGC.AntonioAnte.Client.Infrastructure.Security
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject IUsuarioService UsuarioService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+
+<div class="container-fluid p-0">
+    <div class="row g-0 min-vh-100">
+
+        <div class="col-lg-6 d-none d-lg-flex flex-column justify-content-center align-items-center position-relative overflow-hidden">
+            <div class="absolute-fill bg-base"></div>
+            <div class="login-shape shape-1"></div>
+            <div class="login-shape shape-2"></div>
+            <div class="absolute-fill grid-pattern"></div>
+
+            <div class="position-relative z-2 text-center p-5 glass-card mx-5">
+                <div class="mb-4 d-inline-block p-3 rounded-circle bg-white bg-opacity-10 text-white border border-white border-opacity-25 shadow-lg">
+                    <i class="bi bi-map-fill display-4"></i>
+                </div>
+                <h1 class="display-5 fw-bold mb-3 text-white">SGC Antonio Ante</h1>
+                <p class="lead text-white-50">
+                    Sistema de Gestión Catastral y Administración Territorial.
+                </p>
+            </div>
+        </div>
+
+        <div class="col-lg-6 d-flex align-items-center justify-content-center bg-light-gray position-relative">
+
+            <div class="position-absolute top-0 end-0 p-5 mt-5 me-5 d-none d-md-block opacity-25">
+                <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="50" cy="50" r="50" fill="#E2E8F0" />
+                </svg>
+            </div>
+
+            <div class="login-card shadow-lg w-100 mx-3 mx-md-5" style="max-width: 480px;">
+                <div class="card-accent-bar"></div>
+
+                <div class="p-4 p-md-5">
+                    <div class="text-center mb-4">
+                        <h3 class="fw-bold text-dark">Bienvenido Funcionario</h3>
+                        <p class="text-muted small">Ingresa tus credenciales auditadas para continuar.</p>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(errorMensaje))
+                    {
+                        <div class="alert @(cuentaBloqueada ? "alert-danger" : "alert-warning") d-flex align-items-center mb-4 border-0 shadow-sm rounded-3 small" role="alert">
+                            <i class="bi @(cuentaBloqueada ? "bi-shield-lock-fill" : "bi-exclamation-triangle-fill") me-2 fs-5"></i>
+                            <div>
+                                <span>@errorMensaje</span>
+                                @if (cuentaBloqueada)
+                                {
+                                    <strong class="d-block mt-1">Tiempo restante: @FormatearTiempo(segundosRestantes)</strong>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <EditForm Model="@credenciales" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
+
+                        <div class="form-floating mb-3">
+                            <InputText id="identificacion" class="form-control" @bind-Value="credenciales.Identificacion" placeholder="100xxxxxxx" disabled="@cuentaBloqueada" />
+                            <label for="identificacion">Identificación (Cédula)</label>
+                            <ValidationMessage For="@(() => credenciales.Identificacion)" class="text-danger small mt-1" />
+                        </div>
+
+                        <div class="form-floating mb-4 position-relative">
+                            <InputText type="@(mostrarPassword ? "text" : "password")" id="password" class="form-control" @bind-Value="credenciales.Password" placeholder="Password" disabled="@cuentaBloqueada" autocomplete="current-password" />
+                            <label for="password">Contraseña</label>
+                            <button type="button" class="btn btn-link position-absolute end-0 top-0 mt-2 me-2 text-muted z-3 text-decoration-none" @onclick="TogglePassword" style="box-shadow: none;">
+                                <i class="bi @(mostrarPassword ? "bi-eye-slash-fill" : "bi-eye-fill")"></i>
+                            </button>
+                            <ValidationMessage For="@(() => credenciales.Password)" class="text-danger small mt-1" />
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="rememberMe" disabled="@cuentaBloqueada">
+                                <label class="form-check-label text-muted small" for="rememberMe">Recordarme</label>
+                            </div>
+                            <a href="recuperar-password" class="text-decoration-none small fw-semibold link-accent">¿Olvidaste tu contraseña?</a>
+                        </div>
+
+                        <div class="d-grid gap-2 mb-4">
+                            <button type="submit" class="btn btn-primary btn-lg shadow-hover fw-semibold" disabled="@(procesando || cuentaBloqueada)">
+                                @if (procesando)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                    <span>Verificando...</span>
+                                }
+                                else
+                                {
+                                    <span>Iniciar Sesión</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+
+            <div class="position-absolute bottom-0 w-100 text-center pb-3">
+                <small class="text-muted-light" style="font-size: 0.75rem;">&copy; @DateTime.Now.Year GAD Municipal Antonio Ante</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Estilos movidos a Login.razor.css para evitar conflictos con el parser CSS dentro de archivos .razor -->
+
+@code {
+    private LoginDto credenciales = new();
+    private string errorMensaje = string.Empty;
+    private bool procesando = false;
+    private bool mostrarPassword = false;
+
+    private bool cuentaBloqueada = false;
+    private int segundosRestantes = 0;
+
+    private void TogglePassword() => mostrarPassword = !mostrarPassword;
+
+    private async Task HandleValidSubmit()
+    {
+        if (cuentaBloqueada) return;
+
+        procesando = true;
+        errorMensaje = string.Empty;
+
+        try
+        {
+            var resultado = await UsuarioService.LoginAsync(credenciales);
+
+            if (resultado.Exitoso && resultado.Tokens != null)
+            {
+                var customProvider = (CustomAuthStateProvider)AuthStateProvider;
+                await customProvider.NotificarLogin(resultado.Tokens);
+                Navigation.NavigateTo("");
+            }
+            else if (resultado.CuentaBloqueada)
+            {
+                // Sincroniza los segundos exactos devueltos directamente del LockoutEnd de la Base de Datos
+                await InicializarBloqueoServidor(resultado.SegundosRestantes);
+            }
+            else
+            {
+                errorMensaje = resultado.Mensaje;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMensaje = $"Error en la infraestructura de red del GAD: {ex.Message}";
+        }
+        finally
+        {
+            procesando = false;
+        }
+    }
+
+    private async Task InicializarBloqueoServidor(int segundos)
+    {
+        cuentaBloqueada = true;
+        segundosRestantes = segundos;
+        errorMensaje = "Esta cuenta se encuentra bloqueada temporalmente en la base de datos debido a demasiados intentos fallidos.";
+
+        while (segundosRestantes > 0)
+        {
+            await Task.Delay(1000);
+            segundosRestantes--;
+            StateHasChanged(); // Renderiza de forma asíncrona el segundero reactivo
+        }
+
+        cuentaBloqueada = false;
+        errorMensaje = string.Empty;
+    }
+
+    private string FormatearTiempo(int segundosTotales)
+    {
+        var minutos = segundosTotales / 60;
+        var segundos = segundosTotales % 60;
+        return $"{minutos:D2}:{segundos:D2} min";
+    }
+}

@@ -1,0 +1,109 @@
+.absolute-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.bg-base {
+    background: radial-gradient(circle at bottom left, #0f172a, #1e293b);
+    z-index: 0;
+}
+
+.grid-pattern {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 30px 30px;
+    opacity: 0.5;
+    z-index: 1;
+}
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1.5rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.login-shape {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(90px);
+    z-index: 0;
+    opacity: 0.6;
+    animation: floatShape 12s infinite ease-in-out alternate;
+}
+
+.shape-1 {
+    width: 500px;
+    height: 500px;
+    background: var(--brand-accent);
+    top: -15%;
+    left: -15%;
+}
+
+.shape-2 {
+    width: 400px;
+    height: 400px;
+    background: #7c3aed;
+    bottom: -10%;
+    right: -10%;
+    animation-delay: -5s;
+}
+
+@keyframes floatShape {
+    0% {
+        transform: translate(0, 0);
+    }
+
+    100% {
+        transform: translate(40px, 20px);
+    }
+}
+
+.bg-light-gray {
+    background-color: #f8fafc;
+}
+
+.login-card {
+    background-color: #ffffff;
+    border-radius: 1rem;
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.card-accent-bar {
+    height: 4px;
+    width: 100%;
+    background: linear-gradient(90deg, var(--brand-accent) 0%, #7c3aed 100%);
+}
+
+.link-accent {
+    color: var(--brand-accent);
+    transition: color 0.2s;
+}
+
+.link-accent:hover {
+    color: #1d4ed8;
+    text-decoration: underline !important;
+}
+
+.form-control:focus {
+    border-color: var(--brand-accent);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.shadow-hover {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.shadow-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+}
+
+.text-muted-light {
+    color: #94a3b8;
+}

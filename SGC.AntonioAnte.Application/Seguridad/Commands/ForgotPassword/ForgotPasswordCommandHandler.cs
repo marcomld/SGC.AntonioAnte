@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Identity;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using SGC.AntonioAnte.Domain.Entities;
 using SGC.AntonioAnte.Application.Common.Interfaces;
+using SGC.AntonioAnte.Domain.Seguridad.Entities;
 
 namespace SGC.AntonioAnte.Application.Seguridad.Commands.ForgotPassword
 {

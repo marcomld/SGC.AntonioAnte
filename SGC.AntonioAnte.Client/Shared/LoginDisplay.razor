@@ -1,0 +1,81 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using SGC.AntonioAnte.Client.Infrastructure.Security
+@using SGC.AntonioAnte.Client.Services.Seguridad.Contracts
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IUsuarioService UsuarioService
+
+<AuthorizeView>
+    <Authorized>
+        <div class="dropdown">
+            <button class="btn btn-link text-decoration-none dropdown-toggle d-flex align-items-center gap-2 p-0 text-dark"
+                    type="button"
+                    id="userDropdown"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false">
+
+                <div class="user-avatar">
+                    @GetInitials(context.User.Identity?.Name)
+                </div>
+
+                <div class="d-none d-md-block text-start">
+                    <div class="fw-bold small text-truncate" style="max-width: 150px;">
+                        @context.User.Identity?.Name
+                    </div>
+                    <div class="text-muted" style="font-size: 0.7rem;">Conectado</div>
+                </div>
+            </button>
+
+            <ul class="dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2" aria-labelledby="userDropdown">
+                <li>
+                    <div class="px-3 py-2 border-bottom mb-2">
+                        <span class="d-block small text-muted">Usuario</span>
+                        <span class="fw-bold text-dark">@context.User.Identity?.Name</span>
+                    </div>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <button class="dropdown-item d-flex align-items-center gap-2 text-danger" @onclick="BeginLogOut">
+                        <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+                    </button>
+                </li>
+            </ul>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="d-flex gap-2">
+            <a href="login" class="btn btn-sm btn-primary fw-semibold shadow-sm">
+                Ingresar
+            </a>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private async Task BeginLogOut()
+    {
+        try
+        {
+            // Forzamos la petición al endpoint auditado del backend
+            await UsuarioService.LogoutAsync();
+        }
+        catch
+        {
+            // Prevenimos que una desconexión de red deje atrapado al usuario en el cliente
+        }
+        finally
+        {
+            var customAuthProvider = (CustomAuthStateProvider)AuthStateProvider;
+            await customAuthProvider.NotificarLogout();
+            Navigation.NavigateTo("/login");
+        }
+    }
+
+    private string GetInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "U";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0][0].ToString().ToUpper();
+        return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+    }
+}

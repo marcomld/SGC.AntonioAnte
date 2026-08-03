@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SGC.AntonioAnte.Application\SGC.AntonioAnte.Application.csproj" />
+    <ProjectReference Include="..\SGC.AntonioAnte.Client\SGC.AntonioAnte.Client.csproj" />
     <ProjectReference Include="..\SGC.AntonioAnte.Infrastructure\SGC.AntonioAnte.Infrastructure.csproj" />
     <ProjectReference Include="..\SGC.AntonioAnte.Shared\SGC.AntonioAnte.Shared.csproj" />
   </ItemGroup>

@@ -1,6 +1,9 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using SGC.AntonioAnte.Application.Common;
 using SGC.AntonioAnte.Application.Seguridad.Commands.Claims;
 using SGC.AntonioAnte.Application.Seguridad.Commands.CreateUsuario;
 using SGC.AntonioAnte.Application.Seguridad.Commands.ForgotPassword;
@@ -8,21 +11,41 @@ using SGC.AntonioAnte.Application.Seguridad.Commands.Login;
 using SGC.AntonioAnte.Application.Seguridad.Commands.Logout;
 using SGC.AntonioAnte.Application.Seguridad.Commands.RefreshToken;
 using SGC.AntonioAnte.Application.Seguridad.Commands.ResetPassword;
+using SGC.AntonioAnte.Application.Seguridad.Queries;
+using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad;
 using System;
 using System.Threading.Tasks;
 
-namespace SGC.AntonioAnte.API.Controllers
+namespace SGC.AntonioAnte.API.Controllers.Seguridad
 {
     [ApiController]
     [Route("api/v1/seguridad/usuarios")]
     public class UsuariosController : ControllerBase
     {
         private readonly IMediator _mediator;
+        private readonly UserManager<Usuario> _userManager;
 
-        public UsuariosController(IMediator mediator)
+        public UsuariosController(IMediator mediator, UserManager<Usuario> userManager)
         {
             _mediator = mediator;
+            _userManager = userManager;
+        }
+
+        [HttpGet]
+        [Authorize(Roles = "AdminSistemas")] // Protegido bajo las políticas de auditoría del GAD
+        public async Task<IActionResult> ObtenerTodosLosFuncionarios()
+        {
+            // Invocamos al Query de MediatR encargado de consultar la base de datos
+            var query = new ObtenerTodosUsuariosQuery();
+            var resultado = await _mediator.Send(query);
+
+            if (resultado.IsSuccess)
+            {
+                return Ok(new { data = resultado.Value, mensaje = "Nómina recuperada" });
+            }
+
+            return BadRequest(new { mensaje = "No se pudo consultar la lista de funcionarios" });
         }
 
         [HttpPost]
@@ -115,18 +138,28 @@ namespace SGC.AntonioAnte.API.Controllers
             return Ok(new { Mensaje = "Contraseña restablecida exitosamente." });
         }
 
-        [HttpPost("{id}/permisos")]
-        public async Task<IActionResult> AsignarPermisoGranular([FromRoute] Guid id, [FromBody] AddClaimDto dto)
+        // TAREA 3: Endpoint de asignación de permisos buscando determinísticamente por la Cédula (Identificación)
+        [HttpPost("{identificacion}/permisos")]
+        public async Task<IActionResult> AsignarPermisosFuncionario([FromRoute] string identificacion, [FromBody] AddClaimDto claimDto)
         {
+            // 1. Buscamos al usuario de forma determinista usando la Cédula (Identificacion)
+            var usuario = await _userManager.Users.FirstOrDefaultAsync(u => u.Identificacion == identificacion && u.EstadoActivo);
+
+            if (usuario == null)
+            {
+                return NotFound(new { Mensaje = "El funcionario especificado no existe o se encuentra inactivo." });
+            }
+
+            // 2. Ejecutamos el comando de MediatR pasando el ID real (Guid) del usuario de Identity
             var command = new AddClaimCommand
             {
-                UsuarioId = id,
-                ClaimType = dto.TipoClaim,
-                ClaimValue = dto.ValorClaim
+                UsuarioId = usuario.Id,
+                ClaimType = claimDto.TipoClaim,
+                ClaimValue = claimDto.ValorClaim
             };
 
             await _mediator.Send(command);
-            return Ok(new { Mensaje = "Permiso granular asignado y auditado exitosamente." });
+            return Ok(new { Mensaje = "Privilegio catastral inyectado y auditado con éxito para el funcionario." });
         }
     }
 }

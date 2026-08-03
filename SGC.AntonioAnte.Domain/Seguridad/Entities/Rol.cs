@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SGC.AntonioAnte.Domain.Entities
+namespace SGC.AntonioAnte.Domain.Seguridad.Entities
 {
     public class Rol : IdentityRole<Guid>
     {

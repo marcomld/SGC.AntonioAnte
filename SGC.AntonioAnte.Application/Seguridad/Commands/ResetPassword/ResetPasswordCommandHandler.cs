@@ -1,7 +1,7 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Identity;
 using SGC.AntonioAnte.Application.Common.Interfaces;
-using SGC.AntonioAnte.Domain.Entities;
+using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;

@@ -1,7 +1,7 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Identity;
 using SGC.AntonioAnte.Application.Common.Interfaces;
-using SGC.AntonioAnte.Domain.Entities;
+using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -57,8 +57,21 @@ namespace SGC.AntonioAnte.Application.Seguridad.Commands.CreateUsuario
 
             if (!result.Succeeded)
             {
-                var primerError = string.Join("; ", result.Errors.Select(e => e.Description));
-                throw new Exception($"Error al crear el funcionario: {primerError}");
+                // TAREA 1: Capturamos el primer error de Identity y lo traducimos al español
+                var errorBase = result.Errors.FirstOrDefault();
+                string mensajeTraducido = errorBase?.Code switch
+                {
+                    "DuplicateUserName" => "La identificación (Cédula) ingresada ya pertenece a un funcionario registrado.",
+                    "DuplicateEmail" => "El correo electrónico institucional ya se encuentra registrado.",
+                    "PasswordTooShort" => "La contraseña provista no cumple con la longitud mínima de 8 caracteres.",
+                    "PasswordRequiresNonAlphanumeric" => "La contraseña debe contener al menos un carácter especial (!, @, #, etc.).",
+                    "PasswordRequiresDigit" => "La contraseña debe contener al menos un número (0-9).",
+                    "PasswordRequiresUpper" => "La contraseña debe contener al menos una letra mayúscula (A-Z).",
+                    "PasswordRequiresLower" => "La contraseña debe contener al menos una letra minúscula (a-z).",
+                    _ => errorBase?.Description ?? "No se pudo procesar el alta del funcionario en la base de datos."
+                };
+
+                throw new Exception(mensajeTraducido);
             }
 
             // 4. Asignar el rol al usuario (Tabla Seguridad.UsuarioRoles)

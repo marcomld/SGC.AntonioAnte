@@ -1,0 +1,168 @@
+﻿@page "/seguridad/permisos"
+@attribute [Authorize(Roles = "AdminSistemas")]
+@using SGC.AntonioAnte.Shared.DTOs.Seguridad
+@using SGC.AntonioAnte.Client.Services.Seguridad.Contracts
+@using Microsoft.AspNetCore.Authorization
+
+@inject IUsuarioService UsuarioService
+@inject NavigationManager Navigation
+
+<div class="container py-4 animate-fade-in" style="max-width: 600px;">
+    <div class="mb-3">
+        <a href="seguridad/usuarios" class="text-decoration-none small text-muted fw-semibold">
+            <i class="bi bi-arrow-left"></i> Volver a la nómina
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-lg bg-white overflow-hidden">
+        <div class="card-accent-bar" style="height: 4px; background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);"></div>
+        <div class="card-body p-4 p-md-5">
+            <div class="text-center mb-4">
+                <div class="mb-3 d-inline-block p-3 rounded-circle bg-warning bg-opacity-10 text-warning">
+                    <i class="bi bi-shield-lock-fill fs-3"></i>
+                </div>
+                <h3 class="fw-bold text-dark">Privilegios y Claims</h3>
+                <p class="text-muted small">Asignación de facultades transaccionales específicas para el funcionario: <strong class="text-dark">@Identificacion</strong></p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMensaje))
+            {
+                <div class="alert alert-danger border-0 shadow-sm small mb-4" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> @errorMensaje
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(mensajeExito))
+            {
+                <div class="alert alert-success border-0 shadow-sm small mb-4" role="alert">
+                    <i class="bi bi-check-circle-fill me-2"></i> @mensajeExito
+                </div>
+            }
+
+            <EditForm Model="@modeloClaim" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+
+                <div class="form-floating mb-3">
+                    <InputSelect id="ddlClaimType" class="form-select" @bind-Value="modeloClaim.TipoClaim" disabled="@procesando">
+                        <option value="">Seleccione Módulo...</option>
+                        <option value="CatastroFichas">Módulo Catastral - Fichas Urbanas/Rurales</option>
+                        <option value="VisorGIS">Módulo Catastral - Visor Geoespacial ArcGIS</option>
+                        <option value="Emisiones">Módulo de Emisión Tributaria y Títulos</option>
+                        <option value="Auditoria">Módulo del Sistema - Auditoría General</option>
+                    </InputSelect>
+                    <label for="ddlClaimType">Módulo Predial Destino</label>
+                    <ValidationMessage For="@(() => modeloClaim.TipoClaim)" class="text-danger small mt-1" />
+                </div>
+
+                <div class="form-floating mb-4">
+                    <InputSelect id="ddlClaimValue" class="form-select" @bind-Value="modeloClaim.ValorClaim" disabled="@procesando">
+                        <option value="">Seleccione el nivel de privilegio...</option>
+                        <option value="Lectura">Lectura (Consultas básicas de fichas)</option>
+                        <option value="Escritura">Escritura (Creación y edición predial)</option>
+                        <option value="Aprobacion">Aprobación (Firma de avalúos y emisiones catastrales)</option>
+                    </InputSelect>
+                    <label for="ddlClaimValue">Acción Autorizada</label>
+                    <ValidationMessage For="@(() => modeloClaim.ValorClaim)" class="text-danger small mt-1" />
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg shadow-hover fw-semibold" disabled="@procesando">
+                        @if (procesando)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span> <span>Inyectando Privilegio...</span>
+                        }
+                        else
+                        {
+                            <span><i class="bi bi-key-fill me-1"></i> Otorgar Permiso Auditado</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+<style>
+    .bg-light-gray {
+        background-color: #f8fafc;
+    }
+
+    .login-card {
+        background-color: #ffffff;
+        border-radius: 1rem;
+        overflow: hidden;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .card-accent-bar {
+        height: 4px;
+        width: 100%;
+        background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+    }
+
+    .animate-fade-in {
+        animation: fadeIn 0.25s ease-out;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(5px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+
+@code {
+    private AddClaimDto modeloClaim = new();
+    private string errorMensaje = string.Empty;
+    private string mensajeExito = string.Empty;
+    private bool procesando = false;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "identificacion")]
+    public string? Identificacion { get; set; }
+
+    private async Task HandleValidSubmit()
+    {
+        if (string.IsNullOrEmpty(modeloClaim.TipoClaim) || string.IsNullOrEmpty(modeloClaim.ValorClaim))
+        {
+            errorMensaje = "Debe seleccionar de forma obligatoria tanto el módulo como la acción autorizada.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Identificacion))
+        {
+            errorMensaje = "Identificación del funcionario no especificada. Use el parámetro 'identificacion' en la URL.";
+            return;
+        }
+
+        procesando = true;
+        errorMensaje = string.Empty;
+        mensajeExito = string.Empty;
+
+        // INYECCIÓN REAL: Pasamos la cédula directamente al servicio para que golpee el nuevo endpoint
+        var resultado = await UsuarioService.AsignarPermisosAsync(Identificacion, modeloClaim);
+
+        if (resultado.Exitoso)
+        {
+            mensajeExito = $"Permiso municipal [{modeloClaim.TipoClaim} - {modeloClaim.ValorClaim}] asignado y auditado con éxito.";
+            modeloClaim = new AddClaimDto(); // Resetea el formulario limpiamente
+        }
+        else
+        {
+            // Mostramos el motivo real por el que el GAD rechazó el permiso
+            errorMensaje = resultado.Mensaje ?? "No se pudo inyectar el Claim en el servidor.";
+        }
+
+        procesando = false;
+    }
+}
