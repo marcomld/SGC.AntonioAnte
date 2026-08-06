@@ -17,8 +17,13 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence.Configurations.Seguridad
             builder.Property(u => u.Identificacion).HasMaxLength(20).IsRequired();
             builder.Property(u => u.Nombres).HasMaxLength(150).IsRequired();
             builder.Property(u => u.Apellidos).HasMaxLength(150).IsRequired();
-            builder.Property(u => u.Departamento).HasMaxLength(100);
             builder.Property(u => u.FechaCreacion).IsRequired();
+
+            // 🔹 Nuevo: Configuración de la Relación Usuario -> Departamento
+            builder.HasOne(u => u.Departamento)
+                   .WithMany(d => d.Usuarios)
+                   .HasForeignKey(u => u.DepartamentoId)
+                   .OnDelete(DeleteBehavior.SetNull); // Si se borra un departamento, los usuarios quedan en NULL, no se borran.
         }
     }
 }

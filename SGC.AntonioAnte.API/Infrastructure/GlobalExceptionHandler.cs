@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Common.Exceptions;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad;
+using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 using System;
 using System.Linq;
 using System.Threading;

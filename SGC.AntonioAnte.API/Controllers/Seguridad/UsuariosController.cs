@@ -4,156 +4,108 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SGC.AntonioAnte.Application.Common;
-using SGC.AntonioAnte.Application.Seguridad.Commands.Claims;
-using SGC.AntonioAnte.Application.Seguridad.Commands.CreateUsuario;
-using SGC.AntonioAnte.Application.Seguridad.Commands.ForgotPassword;
-using SGC.AntonioAnte.Application.Seguridad.Commands.Login;
-using SGC.AntonioAnte.Application.Seguridad.Commands.Logout;
-using SGC.AntonioAnte.Application.Seguridad.Commands.RefreshToken;
-using SGC.AntonioAnte.Application.Seguridad.Commands.ResetPassword;
-using SGC.AntonioAnte.Application.Seguridad.Queries;
+using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.AddClaim;
+using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.CreateUsuario;
+using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword;
+using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Login;
+using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Logout;
+using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken;
+using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ResetPassword;
+using SGC.AntonioAnte.Application.Seguridad.Usuarios.Queries;
+using SGC.AntonioAnte.Application.Seguridad.Usuarios;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
-using SGC.AntonioAnte.Shared.DTOs.Seguridad;
+using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
+using SGC.AntonioAnte.Shared.DTOs.Seguridad.Usuarios;
 using System;
 using System.Threading.Tasks;
+using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.UpdateUsuario;
+using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.CambiarEstadoUsuario;
 
 namespace SGC.AntonioAnte.API.Controllers.Seguridad
 {
     [ApiController]
     [Route("api/v1/seguridad/usuarios")]
+    [Authorize(Roles = "AdminSistemas,SuperAdmin")]
     public class UsuariosController : ControllerBase
     {
         private readonly IMediator _mediator;
-        private readonly UserManager<Usuario> _userManager;
 
-        public UsuariosController(IMediator mediator, UserManager<Usuario> userManager)
+        public UsuariosController(IMediator mediator)
         {
             _mediator = mediator;
-            _userManager = userManager;
         }
 
         [HttpGet]
-        [Authorize(Roles = "AdminSistemas")] // Protegido bajo las políticas de auditoría del GAD
-        public async Task<IActionResult> ObtenerTodosLosFuncionarios()
+        public async Task<IActionResult> ObtenerTodos()
         {
-            // Invocamos al Query de MediatR encargado de consultar la base de datos
             var query = new ObtenerTodosUsuariosQuery();
             var resultado = await _mediator.Send(query);
 
             if (resultado.IsSuccess)
             {
-                return Ok(new { data = resultado.Value, mensaje = "Nómina recuperada" });
+                return Ok(new { data = resultado.Value, mensaje = "Nómina de funcionarios recuperada." });
             }
 
-            return BadRequest(new { mensaje = "No se pudo consultar la lista de funcionarios" });
+            return BadRequest(new { mensaje = "No se pudo consultar la nómina." });
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateUsuario([FromBody] CreateUsuarioDto dto)
+        public async Task<IActionResult> Registrar([FromBody] CreateUsuarioDto dto)
         {
-            try
-            {
-                var command = new CreateUsuarioCommand
-                {
-                    Identificacion = dto.Identificacion,
-                    Nombres = dto.Nombres,
-                    Apellidos = dto.Apellidos,
-                    Email = dto.Email,
-                    Departamento = dto.Departamento,
-                    Password = dto.Password,
-                    RolAsignado = dto.RolAsignado
-                };
-
-                var nuevoUsuarioId = await _mediator.Send(command);
-                return Ok(new { Id = nuevoUsuarioId, Mensaje = "Funcionario registrado exitosamente." });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(ex.Message);
-            }
-        }
-
-        [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginDto dto)
-        {
-            var command = new LoginCommand
+            var command = new CreateUsuarioCommand
             {
                 Identificacion = dto.Identificacion,
-                Password = dto.Password
-            };
-
-            var tokens = await _mediator.Send(command);
-            return Ok(new
-            {
-                Data = tokens,
-                Mensaje = "Inicio de sesión exitoso."
-            });
-        }
-
-        [HttpPost("refresh-token")]
-        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenDto dto)
-        {
-            var command = new RefreshTokenCommand
-            {
-                AccessToken = dto.AccessToken,
-                RefreshToken = dto.RefreshToken
-            };
-
-            var tokens = await _mediator.Send(command);
-            return Ok(tokens);
-        }
-
-        [Authorize]
-        [HttpPost("logout")]
-        public async Task<IActionResult> Logout()
-        {
-            await _mediator.Send(new LogoutCommand());
-            return Ok(new { Mensaje = "Sesión cerrada correctamente." });
-        }
-
-        [HttpPost("solicitar-recuperacion")]
-        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
-        {
-            var command = new ForgotPasswordCommand
-            {
-                Email = dto.Email
-            };
-
-            // Ejecuta el envío y audita internamente sin retornar el código OTP en el JSON
-            await _mediator.Send(command);
-            return Ok(new { Mensaje = "Código de verificación (OTP) enviado exitosamente al correo electrónico institucional." });
-        }
-
-        [HttpPost("restablecer-password")]
-        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
-        {
-            var command = new ResetPasswordCommand
-            {
+                Nombres = dto.Nombres,
+                Apellidos = dto.Apellidos,
                 Email = dto.Email,
-                Token = dto.Token, // El cliente Blazor mandará los 6 dígitos aquí
-                NuevaPassword = dto.NuevaPassword
+                DepartamentoId = dto.DepartamentoId,
+                Password = dto.Password,
+                RolAsignado = dto.RolAsignado
+            };
+
+            var nuevoUsuarioId = await _mediator.Send(command);
+            return Ok(new { Id = nuevoUsuarioId, Mensaje = "Funcionario registrado exitosamente." });
+        }
+
+        [HttpPut("{id:guid}")]
+        public async Task<IActionResult> Actualizar([FromRoute] Guid id, [FromBody] UpdateUsuarioDto dto)
+        {
+            var command = new UpdateUsuarioCommand
+            {
+                Id = id,
+                Nombres = dto.Nombres,
+                Apellidos = dto.Apellidos,
+                Email = dto.Email,
+                DepartamentoId = dto.DepartamentoId
             };
 
             await _mediator.Send(command);
-            return Ok(new { Mensaje = "Contraseña restablecida exitosamente." });
+            return Ok(new { Mensaje = "Datos del funcionario actualizados exitosamente." });
         }
 
-        // TAREA 3: Endpoint de asignación de permisos buscando determinísticamente por la Cédula (Identificación)
-        [HttpPost("{identificacion}/permisos")]
-        public async Task<IActionResult> AsignarPermisosFuncionario([FromRoute] string identificacion, [FromBody] AddClaimDto claimDto)
+        [HttpPut("{id:guid}/activar")]
+        public async Task<IActionResult> Activar([FromRoute] Guid id)
         {
-            // 1. Buscamos al usuario de forma determinista usando la Cédula (Identificacion)
-            var usuario = await _userManager.Users.FirstOrDefaultAsync(u => u.Identificacion == identificacion && u.EstadoActivo);
+            var command = new CambiarEstadoUsuarioCommand { Id = id, EstadoActivo = true };
+            await _mediator.Send(command);
+            return Ok(new { Mensaje = "Funcionario activado exitosamente." });
+        }
 
-            if (usuario == null)
-            {
-                return NotFound(new { Mensaje = "El funcionario especificado no existe o se encuentra inactivo." });
-            }
+        [HttpPut("{id:guid}/desactivar")]
+        public async Task<IActionResult> Desactivar([FromRoute] Guid id)
+        {
+            var command = new CambiarEstadoUsuarioCommand { Id = id, EstadoActivo = false };
+            await _mediator.Send(command);
+            return Ok(new { Mensaje = "Funcionario desactivado exitosamente (Soft Delete)." });
+        }
 
-            // 2. Ejecutamos el comando de MediatR pasando el ID real (Guid) del usuario de Identity
+        // CIBERSEGURIDAD: Uso exclusivo de GUID en lugar de Cédula (Prevención IDOR / OWASP A01:2021)
+        [HttpPost("{id:guid}/claims")]
+        public async Task<IActionResult> AsignarClaim([FromRoute] Guid id, [FromBody] AddClaimDto claimDto)
+        {
             var command = new AddClaimCommand
             {
-                UsuarioId = usuario.Id,
+                UsuarioId = id,
                 ClaimType = claimDto.TipoClaim,
                 ClaimValue = claimDto.ValorClaim
             };

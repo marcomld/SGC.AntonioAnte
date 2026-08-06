@@ -6,8 +6,8 @@ using SGC.AntonioAnte.Client.Infrastructure.Http;
 using SGC.AntonioAnte.Client.Infrastructure.Security;
 using SGC.AntonioAnte.Client.Services;
 using SGC.AntonioAnte.Client.Services.Contracts;
-using SGC.AntonioAnte.Client.Services.Seguridad;
 using SGC.AntonioAnte.Client.Services.Seguridad.Contracts;
+using SGC.AntonioAnte.Client.Services.Seguridad.Implementation;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -22,6 +22,10 @@ builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>
 
 // Registro del Servicio de Usuarios (NUEVO)
 builder.Services.AddScoped<IUsuarioService, UsuarioService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IDepartamentoService, DepartamentoService>();
+builder.Services.AddScoped<IRoleService, RoleService>();
+builder.Services.AddScoped<IAuditoriaService, AuditoriaService>();
 
 // 2. Registro del Interceptor
 builder.Services.AddTransient<IdentityHandler>();

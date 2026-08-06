@@ -6,6 +6,8 @@
   </Folder>
   <Folder Name="/docs/M1_Seguridad/">
     <File Path="Manual_Seguridad_M1_v1.md" />
+    <File Path="Manual_Seguridad_M1_v2.md" />
+    <File Path="PENDIENTE_POLITICAS_AUTORIZACION.md" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="SGC.AntonioAnte.API/SGC.AntonioAnte.API.csproj" Id="b5fe65c6-86b6-4bc4-a8c7-823418a27c93" />

@@ -3,7 +3,7 @@
 @using SGC.AntonioAnte.Client.Services.Seguridad.Contracts
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthStateProvider
-@inject IUsuarioService UsuarioService
+@inject IAuthService AuthService
 
 <AuthorizeView>
     <Authorized>
@@ -57,7 +57,7 @@
         try
         {
             // Forzamos la petición al endpoint auditado del backend
-            await UsuarioService.LogoutAsync();
+            await AuthService.LogoutAsync();
         }
         catch
         {

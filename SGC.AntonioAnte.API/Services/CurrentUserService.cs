@@ -16,6 +16,8 @@ namespace SGC.AntonioAnte.API.Services
         public string? UsuarioId => _httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier)
                                  ?? _httpContextAccessor.HttpContext?.User?.FindFirstValue("sub");
 
+        public Guid? UsuarioIdGuid => Guid.TryParse(UsuarioId, out var parsedGuid) ? parsedGuid : null;
+
         // Obtenemos la IP real
         public string IpAddress => _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString() ?? "Desconocida";
 

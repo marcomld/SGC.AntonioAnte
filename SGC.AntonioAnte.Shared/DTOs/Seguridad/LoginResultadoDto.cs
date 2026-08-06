@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;

@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components.Authorization;
 using SGC.AntonioAnte.Client.Services.Contracts;
 using SGC.AntonioAnte.Client.Utils;
-using SGC.AntonioAnte.Shared.DTOs.Seguridad;
+using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 using System.Security.Claims;
 
 namespace SGC.AntonioAnte.Client.Infrastructure.Security

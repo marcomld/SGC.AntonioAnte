@@ -17,6 +17,12 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence.Configurations.Seguridad
             builder.HasKey(a => a.Id);
             builder.Property(a => a.Accion).HasMaxLength(100).IsRequired();
             builder.Property(a => a.Entidad).HasMaxLength(100).IsRequired();
+
+            // 🔹 Nuevo: Configuración de la Relación Auditoria -> Usuario (Candado de Seguridad)
+            builder.HasOne(a => a.Usuario)
+                   .WithMany(u => u.Auditorias)
+                   .HasForeignKey(a => a.UsuarioId)
+                   .OnDelete(DeleteBehavior.Restrict); // ¡Protege los registros históricos!
         }
     }
 }

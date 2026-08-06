@@ -5,8 +5,8 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Components.Authorization;
 using SGC.AntonioAnte.Client.Infrastructure.Security;
 using SGC.AntonioAnte.Client.Services.Contracts;
-using SGC.AntonioAnte.Shared.DTOs.Seguridad;
-using System.Net.Http; // Agregado para IHttpClientFactory
+using System.Net.Http;
+using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth; // Agregado para IHttpClientFactory
 
 namespace SGC.AntonioAnte.Client.Infrastructure.Http
 {

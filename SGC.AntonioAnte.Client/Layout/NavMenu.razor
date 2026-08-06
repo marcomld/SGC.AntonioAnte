@@ -1,6 +1,5 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
 
-
 <div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand d-flex align-items-center gap-2" href="">
@@ -52,6 +51,16 @@
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="seguridad/roles">
                     <i class="bi bi-key me-2"></i> Roles y Permisos
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link rounded-3" href="seguridad/departamentos" Match="NavLinkMatch.Prefix">
+                    <i class="bi bi-building-fill me-2"></i> Departamentos
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="seguridad/auditoria">
+                    <i class="bi bi-journal-text me-2"></i> Auditoría
                 </NavLink>
             </div>
         </AuthorizeView>

@@ -22,6 +22,8 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
         }
 
         public DbSet<Auditoria> Auditorias { get; set; }
+        public DbSet<Departamento> Departamentos { get; set; }
+
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);

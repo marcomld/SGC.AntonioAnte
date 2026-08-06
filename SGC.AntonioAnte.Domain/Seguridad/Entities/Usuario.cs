@@ -12,8 +12,15 @@ namespace SGC.AntonioAnte.Domain.Seguridad.Entities
         public string Identificacion { get; set; } = string.Empty;
         public string Nombres { get; set; } = string.Empty;
         public string Apellidos { get; set; } = string.Empty;
-        public string Departamento { get; set; } = string.Empty;
+
+        // 🔹 Nuevo: Llave foránea hacia Departamento (Nullable por si es SuperAdmin)
+        public Guid? DepartamentoId { get; set; }
+        public virtual Departamento? Departamento { get; set; } // Propiedad de Navegación
+
         public bool EstadoActivo { get; set; } = true;
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
+
+        // 🔹 Nuevo: Relación inversa (Un usuario tiene muchas auditorías)
+        public virtual ICollection<Auditoria> Auditorias { get; set; } = new List<Auditoria>();
     }
 }

@@ -125,7 +125,7 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
                     b.ToTable("UsuarioTokens", "Seguridad");
                 });
 
-            modelBuilder.Entity("SGC.AntonioAnte.Domain.Entities.Auditoria", b =>
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Seguridad.Entities.Auditoria", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -133,8 +133,8 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
 
                     b.Property<string>("Accion")
                         .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("DatosAdicionales")
                         .HasColumnType("nvarchar(max)");
@@ -163,10 +163,40 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("UsuarioId");
+
                     b.ToTable("Auditorias", "Seguridad");
                 });
 
-            modelBuilder.Entity("SGC.AntonioAnte.Domain.Entities.Rol", b =>
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Seguridad.Entities.Departamento", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Descripcion")
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<bool>("EstadoActivo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Departamentos", "Seguridad");
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Seguridad.Entities.Rol", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -199,7 +229,7 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
                     b.ToTable("Roles", "Seguridad");
                 });
 
-            modelBuilder.Entity("SGC.AntonioAnte.Domain.Entities.Usuario", b =>
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Seguridad.Entities.Usuario", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -217,10 +247,8 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Departamento")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                    b.Property<Guid?>("DepartamentoId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
@@ -280,6 +308,8 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DepartamentoId");
+
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
 
@@ -293,7 +323,7 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
                 {
-                    b.HasOne("SGC.AntonioAnte.Domain.Entities.Rol", null)
+                    b.HasOne("SGC.AntonioAnte.Domain.Seguridad.Entities.Rol", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -302,7 +332,7 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<System.Guid>", b =>
                 {
-                    b.HasOne("SGC.AntonioAnte.Domain.Entities.Usuario", null)
+                    b.HasOne("SGC.AntonioAnte.Domain.Seguridad.Entities.Usuario", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -311,7 +341,7 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<System.Guid>", b =>
                 {
-                    b.HasOne("SGC.AntonioAnte.Domain.Entities.Usuario", null)
+                    b.HasOne("SGC.AntonioAnte.Domain.Seguridad.Entities.Usuario", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -320,13 +350,13 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserRole<System.Guid>", b =>
                 {
-                    b.HasOne("SGC.AntonioAnte.Domain.Entities.Rol", null)
+                    b.HasOne("SGC.AntonioAnte.Domain.Seguridad.Entities.Rol", null)
                         .WithMany()
                         .HasForeignKey("RoleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("SGC.AntonioAnte.Domain.Entities.Usuario", null)
+                    b.HasOne("SGC.AntonioAnte.Domain.Seguridad.Entities.Usuario", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -335,11 +365,41 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<System.Guid>", b =>
                 {
-                    b.HasOne("SGC.AntonioAnte.Domain.Entities.Usuario", null)
+                    b.HasOne("SGC.AntonioAnte.Domain.Seguridad.Entities.Usuario", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Seguridad.Entities.Auditoria", b =>
+                {
+                    b.HasOne("SGC.AntonioAnte.Domain.Seguridad.Entities.Usuario", "Usuario")
+                        .WithMany("Auditorias")
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Seguridad.Entities.Usuario", b =>
+                {
+                    b.HasOne("SGC.AntonioAnte.Domain.Seguridad.Entities.Departamento", "Departamento")
+                        .WithMany("Usuarios")
+                        .HasForeignKey("DepartamentoId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Departamento");
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Seguridad.Entities.Departamento", b =>
+                {
+                    b.Navigation("Usuarios");
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Seguridad.Entities.Usuario", b =>
+                {
+                    b.Navigation("Auditorias");
                 });
 #pragma warning restore 612, 618
         }

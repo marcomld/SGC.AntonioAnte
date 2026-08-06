@@ -1,0 +1,410 @@
+﻿@page "/seguridad/departamentos"
+@attribute [Authorize(Roles = "AdminSistemas,SuperAdmin")]
+@using SGC.AntonioAnte.Shared.DTOs.Seguridad.Departamentos
+@using SGC.AntonioAnte.Client.Services.Seguridad.Contracts
+@using Microsoft.AspNetCore.Authorization
+@using System.Threading
+@inject IDepartamentoService DepartamentoService
+
+<div class="container-fluid py-4 animate-fade-in">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+        <div>
+            <h1 class="h2 fw-bold text-dark mb-1"><i class="bi bi-building-fill me-2 text-primary"></i>Departamentos Municipales</h1>
+            <p class="text-muted small mb-0">Catálogo paramétrico de direcciones y jefaturas del GAD Municipal de Antonio Ante.</p>
+        </div>
+        <button class="btn btn-primary d-flex align-items-center gap-2 px-4 shadow-hover py-2 fw-semibold" @onclick="AbrirModalCrear">
+            <i class="bi bi-plus-lg"></i> Nuevo Departamento
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(toastMensaje))
+    {
+        <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1090;">
+            <div class="toast show shadow-lg border-0 bg-white" role="alert">
+                <div class="toast-header @(toastEsExito ? "bg-success text-white" : "bg-danger text-white") border-0 py-2">
+                    <i class="bi @(toastEsExito ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-2 fs-6"></i>
+                    <strong class="me-auto">@(toastEsExito ? "Éxito" : "Atención")</strong>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => toastMensaje = string.Empty"></button>
+                </div>
+                <div class="toast-body fw-medium text-dark py-3">@toastMensaje</div>
+            </div>
+        </div>
+    }
+
+    <div class="card border-0 shadow-lg bg-white overflow-hidden">
+        <div class="card-accent-bar" style="height: 4px; background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);"></div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 custom-table">
+                <thead class="table-light text-uppercase font-monospace text-muted small" style="font-size: 0.75rem;">
+                    <tr>
+                        <th class="ps-4 py-3">Nombre Dirección / Área</th>
+                        <th class="py-3">Descripción</th>
+                        <th class="py-3 text-center">Estado</th>
+                        <th class="text-end pe-4 py-3">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (departamentos == null)
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center py-5">
+                                <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
+                                <span class="text-muted fw-medium">Cargando departamentos municipales...</span>
+                            </td>
+                        </tr>
+                    }
+                    else if (!departamentos.Any())
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center py-5 text-muted">
+                                <i class="bi bi-building-exclamation display-6 d-block mb-2 opacity-50"></i>
+                                <span class="small fw-semibold">No existen departamentos registrados.</span>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var dep in departamentos)
+                        {
+                            <tr class="@(dep.EstadoActivo ? "" : "table-light opacity-75")">
+                                <td class="ps-4 py-3 fw-bold text-dark">@dep.Nombre</td>
+                                <td class="py-3 text-muted small">@(string.IsNullOrWhiteSpace(dep.Descripcion) ? "-" : dep.Descripcion)</td>
+                                <td class="py-3 text-center">
+                                    @if (dep.EstadoActivo)
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1">Activo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5 py-1">Inactivo</span>
+                                    }
+                                </td>
+                                <td class="text-end pe-4 py-3">
+                                    <div class="d-inline-flex gap-1">
+                                        <button class="btn btn-sm btn-outline-secondary rounded-2" title="Editar" @onclick="() => AbrirModalEditar(dep)">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </button>
+                                        <button class="btn btn-sm @(dep.EstadoActivo ? "btn-outline-warning" : "btn-outline-success") rounded-2"
+                                                title="@(dep.EstadoActivo ? "Desactivar" : "Activar")" @onclick="() => SolicitarCambioEstado(dep)">
+                                            <i class="bi @(dep.EstadoActivo ? "bi-toggle-on" : "bi-toggle-off")"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger rounded-2" title="Eliminar Permanentemente" @onclick="() => SolicitarEliminar(dep)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: FORMULARIO CREAR/EDITAR -->
+@if (mostrarModalForm)
+{
+    <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1070;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-4">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi @(depEditandoId.HasValue ? "bi-pencil-square" : "bi-building-add") me-2 text-primary"></i>
+                        @(depEditandoId.HasValue ? "Editar Departamento" : "Nuevo Departamento")
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CerrarModalForm"></button>
+                </div>
+                <div class="modal-body p-4">
+                    @if (!string.IsNullOrEmpty(modalErrorMensaje))
+                    {
+                        <div class="alert alert-danger border-0 shadow-sm small mb-3 rounded-3" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> @modalErrorMensaje
+                        </div>
+                    }
+
+                    <EditForm Model="@modelo" OnValidSubmit="Guardar">
+                        <DataAnnotationsValidator />
+
+                        <div class="form-floating mb-3">
+                            <InputText id="txtNombre" class="form-control" @bind-Value="modelo.Nombre" placeholder="Nombre" disabled="@procesando" />
+                            <label for="txtNombre">Nombre del Departamento</label>
+                            <ValidationMessage For="@(() => modelo.Nombre)" class="text-danger small mt-1" />
+                        </div>
+
+                        <div class="form-floating mb-4">
+                            <InputText id="txtDesc" class="form-control" @bind-Value="modelo.Descripcion" placeholder="Descripción" disabled="@procesando" />
+                            <label for="txtDesc">Descripción / Observación</label>
+                            <ValidationMessage For="@(() => modelo.Descripcion)" class="text-danger small mt-1" />
+                        </div>
+
+                        <!-- Botones horizontales alineados a la derecha -->
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-light fw-semibold text-muted" @onclick="CerrarModalForm" disabled="@procesando">Cancelar</button>
+                            <button type="submit" class="btn btn-primary fw-semibold shadow-sm px-4" disabled="@procesando">
+                                @if (procesando)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span> <span>Guardando...</span>
+                                }
+                                else
+                                {
+                                    <span>Guardar Departamento</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL: CAMBIO DE ESTADO -->
+@if (depAEstadoCambiar != null)
+{
+    <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1080;">
+        <!-- Se removió modal-sm para tamaño estándar -->
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg rounded-4 border-0">
+                <div class="modal-body text-center p-4">
+                    <div class="mb-3">
+                        @if (depAEstadoCambiar.EstadoActivo)
+                        {
+                            <div class="rounded-circle bg-warning-subtle text-warning d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                <i class="bi bi-toggle-off fs-2"></i>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="rounded-circle bg-success-subtle text-success d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                <i class="bi bi-toggle-on fs-2"></i>
+                            </div>
+                        }
+                    </div>
+                    <h5 class="fw-bold text-dark mb-1">¿Estás seguro?</h5>
+                    <p class="text-muted small mb-0">
+                        @(depAEstadoCambiar.EstadoActivo
+                            ? $"Vas a desactivar el departamento '{depAEstadoCambiar.Nombre}'."
+                            : $"Vas a activar el departamento '{depAEstadoCambiar.Nombre}'.")
+                    </p>
+
+                    <!-- Botones horizontales centrados -->
+                    <div class="d-flex justify-content-center gap-3 mt-4">
+                        <button class="btn btn-light fw-semibold text-muted px-4" @onclick="() => depAEstadoCambiar = null">Cancelar</button>
+                        <button class="btn @(depAEstadoCambiar.EstadoActivo ? "btn-warning" : "btn-success") fw-semibold shadow-sm px-4" @onclick="ConfirmarCambioEstado">
+                            Sí, @(depAEstadoCambiar.EstadoActivo ? "Desactivar" : "Activar")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- MODAL: ELIMINAR -->
+@if (depAEliminar != null)
+{
+    <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1085;">
+        <!-- Se removió modal-sm para tamaño estándar -->
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg rounded-4 border-0">
+                <div class="modal-body text-center p-4">
+                    <div class="mb-3">
+                        <div class="rounded-circle bg-danger-subtle text-danger d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                            <i class="bi bi-trash-fill fs-2"></i>
+                        </div>
+                    </div>
+                    <h5 class="fw-bold text-dark mb-1">¿Eliminar Departamento?</h5>
+                    <p class="text-muted small mb-0">
+                        Se eliminará permanentemente <strong>@depAEliminar.Nombre</strong>. Los usuarios asignados pasarán a tener departamento no especificado (SetNull).
+                    </p>
+
+                    <!-- Botones horizontales centrados -->
+                    <div class="d-flex justify-content-center gap-3 mt-4">
+                        <button class="btn btn-light fw-semibold text-muted px-4" @onclick="() => depAEliminar = null">Cancelar</button>
+                        <button class="btn btn-danger fw-semibold shadow-sm px-4" @onclick="ConfirmarEliminacion">Sí, Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .backdrop-blur {
+        background-color: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+    }
+
+    .card-accent-bar {
+        height: 4px;
+        width: 100%;
+        background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
+    }
+
+    .custom-table tbody tr {
+        transition: background-color 0.15s ease;
+    }
+
+        .custom-table tbody tr:hover {
+            background-color: #f8fafc;
+        }
+
+    .shadow-hover {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+        .shadow-hover:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.25);
+        }
+
+    .animate-fade-in {
+        animation: fadeIn 0.25s ease-out;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(5px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+
+@code {
+    private List<DepartamentoDto>? departamentos = null;
+    private bool mostrarModalForm = false;
+    private Guid? depEditandoId = null;
+    private CreateDepartamentoDto modelo = new();
+    private string modalErrorMensaje = string.Empty;
+    private bool procesando = false;
+
+    private DepartamentoDto? depAEstadoCambiar = null;
+    private DepartamentoDto? depAEliminar = null;
+
+    private string toastMensaje = string.Empty;
+    private bool toastEsExito = true;
+    private CancellationTokenSource? toastCts;
+
+    protected override async Task OnInitializedAsync() => await CargarData();
+
+    private async Task CargarData()
+    {
+        departamentos = await DepartamentoService.ObtenerTodosAsync();
+    }
+
+    private void AbrirModalCrear()
+    {
+        depEditandoId = null;
+        modelo = new CreateDepartamentoDto();
+        modalErrorMensaje = string.Empty;
+        mostrarModalForm = true;
+    }
+
+    private void AbrirModalEditar(DepartamentoDto dep)
+    {
+        depEditandoId = dep.Id;
+        modelo = new CreateDepartamentoDto { Nombre = dep.Nombre, Descripcion = dep.Descripcion };
+        modalErrorMensaje = string.Empty;
+        mostrarModalForm = true;
+    }
+
+    private void CerrarModalForm() => mostrarModalForm = false;
+
+    private async Task Guardar()
+    {
+        procesando = true;
+        modalErrorMensaje = string.Empty;
+
+        try
+        {
+            var res = depEditandoId.HasValue
+                ? await DepartamentoService.ActualizarAsync(depEditandoId.Value, modelo)
+                : await DepartamentoService.CrearAsync(modelo);
+
+            if (res.Exitoso)
+            {
+                CerrarModalForm();
+                await CargarData();
+                await MostrarToast(res.Mensaje ?? "Departamento guardado con éxito.");
+            }
+            else
+            {
+                modalErrorMensaje = string.IsNullOrWhiteSpace(res.Mensaje)
+                    ? "No se pudo guardar el departamento."
+                    : res.Mensaje;
+            }
+        }
+        catch (Exception ex)
+        {
+            modalErrorMensaje = $"Error al procesar la solicitud: {ex.Message}";
+        }
+        finally
+        {
+            procesando = false;
+        }
+    }
+
+    // --- ACTIVAR / DESACTIVAR ---
+    private void SolicitarCambioEstado(DepartamentoDto dep) => depAEstadoCambiar = dep;
+
+    private async Task ConfirmarCambioEstado()
+    {
+        if (depAEstadoCambiar == null) return;
+        var dep = depAEstadoCambiar;
+        depAEstadoCambiar = null;
+
+        var res = await DepartamentoService.CambiarEstadoAsync(dep.Id);
+        if (res.Exitoso)
+        {
+            await CargarData();
+            await MostrarToast($"Estado de '{dep.Nombre}' actualizado correctamente.");
+        }
+        else
+        {
+            await MostrarToast(res.Mensaje ?? "No se pudo cambiar el estado.", false);
+        }
+    }
+
+    // --- ELIMINAR ---
+    private void SolicitarEliminar(DepartamentoDto dep) => depAEliminar = dep;
+
+    private async Task ConfirmarEliminacion()
+    {
+        if (depAEliminar == null) return;
+        var dep = depAEliminar;
+        depAEliminar = null;
+
+        var res = await DepartamentoService.EliminarAsync(dep.Id);
+        if (res.Exitoso)
+        {
+            await CargarData();
+            await MostrarToast($"Departamento '{dep.Nombre}' eliminado permanentemente.");
+        }
+        else
+        {
+            await MostrarToast(res.Mensaje ?? "No se pudo eliminar el departamento.", false);
+        }
+    }
+
+    private async Task MostrarToast(string msg, bool esExito = true)
+    {
+        toastCts?.Cancel();
+        toastCts = new CancellationTokenSource();
+        toastMensaje = msg;
+        toastEsExito = esExito;
+        StateHasChanged();
+        try
+        {
+            await Task.Delay(4000, toastCts.Token);
+            toastMensaje = string.Empty;
+            StateHasChanged();
+        }
+        catch (TaskCanceledException) { }
+    }
+}

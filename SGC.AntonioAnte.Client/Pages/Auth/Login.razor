@@ -1,13 +1,14 @@
 ﻿@page "/login"
 @layout AuthLayout
-@using SGC.AntonioAnte.Shared.DTOs.Seguridad
+@using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth
 @using SGC.AntonioAnte.Client.Services.Seguridad.Contracts
 @using SGC.AntonioAnte.Client.Infrastructure.Security
 @using Microsoft.AspNetCore.Components.Authorization
 
-@inject IUsuarioService UsuarioService
+@inject IAuthService AuthService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
+
 
 
 <div class="container-fluid p-0">
@@ -133,7 +134,8 @@
 
         try
         {
-            var resultado = await UsuarioService.LoginAsync(credenciales);
+            // Ahora invoca a AuthService.LoginAsync
+            var resultado = await AuthService.LoginAsync(credenciales);
 
             if (resultado.Exitoso && resultado.Tokens != null)
             {
@@ -143,7 +145,6 @@
             }
             else if (resultado.CuentaBloqueada)
             {
-                // Sincroniza los segundos exactos devueltos directamente del LockoutEnd de la Base de Datos
                 await InicializarBloqueoServidor(resultado.SegundosRestantes);
             }
             else
