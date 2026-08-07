@@ -11,6 +11,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken
@@ -22,7 +23,11 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken
         private readonly IApplicationDbContext _context;
         private readonly ICurrentUserService _currentUserService;
 
-        public RefreshTokenCommandHandler(UserManager<Usuario> userManager, IConfiguration configuration, IApplicationDbContext context, ICurrentUserService currentUserService)
+        public RefreshTokenCommandHandler(
+            UserManager<Usuario> userManager,
+            IConfiguration configuration,
+            IApplicationDbContext context,
+            ICurrentUserService currentUserService)
         {
             _userManager = userManager;
             _configuration = configuration;
@@ -36,17 +41,21 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken
             var principal = GetPrincipalFromExpiredToken(request.AccessToken);
             if (principal == null) throw new Exception("Access Token inválido.");
 
-            var userIdString = principal.FindFirstValue("sub") ?? principal.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!Guid.TryParse(userIdString, out Guid userId)) throw new Exception("Token no contiene un ID de usuario válido.");
+            var userIdString = principal.FindFirstValue(ClaimTypes.NameIdentifier)
+                               ?? principal.FindFirstValue("sub");
+            if (!Guid.TryParse(userIdString, out Guid userId))
+                throw new Exception("Token no contiene un ID de usuario válido.");
 
             var usuario = await _userManager.FindByIdAsync(userId.ToString());
-            if (usuario == null || !usuario.EstadoActivo) throw new Exception("Usuario no encontrado o inactivo.");
+            if (usuario == null || !usuario.EstadoActivo)
+                throw new Exception("Usuario no encontrado o inactivo.");
 
             // 2. Obtener el RefreshToken de la base de datos (Tabla: UsuarioTokens)
             var storedTokenValue = await _userManager.GetAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken");
-            if (string.IsNullOrEmpty(storedTokenValue)) throw new Exception("No existe una sesión activa.");
+            if (string.IsNullOrEmpty(storedTokenValue))
+                throw new Exception("No existe una sesión activa.");
 
-            // Desglosamos nuestro formato: "tokenString|fechaExpiracion"
+            // Desglosamos formato: "tokenString|fechaExpiracion"
             var parts = storedTokenValue.Split('|');
             if (parts.Length != 2 || parts[0] != request.RefreshToken)
             {
@@ -54,14 +63,14 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken
                 throw new Exception("Refresh Token inválido.");
             }
 
-            if (DateTime.Parse(parts[1]).ToUniversalTime() <= DateTime.UtcNow)
+            if (DateTime.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind).ToUniversalTime() <= DateTime.UtcNow)
             {
                 await RegistrarAuditoria(usuario.Id, "REFRESH_RECHAZADO", "Refresh Token expirado.");
                 throw new Exception("Su sesión ha expirado completamente. Vuelva a iniciar sesión.");
             }
 
-            // 3. Generar nuevos Tokens
-            var newAccessToken = GenerarNuevoAccessToken(principal.Claims);
+            // 3. Generar nuevos Tokens reconstruyendo claims limpios desde la BD
+            var newAccessToken = await GenerarNuevoAccessTokenLimpioAsync(usuario);
             var newRefreshTokenString = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
             var newRefreshTokenValue = $"{newRefreshTokenString}|{DateTime.UtcNow.AddDays(7):O}";
 
@@ -69,7 +78,7 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken
             await _userManager.RemoveAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken");
             await _userManager.SetAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken", newRefreshTokenValue);
 
-            await RegistrarAuditoria(usuario.Id, "REFRESH_EXITOSO", "Renovación de sesión exitosa.");
+            // Se elimina la auditoría de REFRESH_EXITOSO para evitar saturar la tabla con renovaciones rutinarias.
 
             return new TokenResponseDto { AccessToken = newAccessToken, RefreshToken = newRefreshTokenString };
         }
@@ -78,11 +87,11 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken
         {
             var tokenValidationParameters = new TokenValidationParameters
             {
-                ValidateAudience = false, // En refresh no es estricto
+                ValidateAudience = false,
                 ValidateIssuer = false,
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JwtSettings:Key"]!)),
-                ValidateLifetime = false // AQUÍ ESTÁ LA CLAVE: Ignoramos que ya haya expirado
+                ValidateLifetime = false // Leemos claims del token expirado
             };
 
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -97,19 +106,32 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken
             return principal;
         }
 
-        private string GenerarNuevoAccessToken(IEnumerable<Claim> claims)
+        private async Task<string> GenerarNuevoAccessTokenLimpioAsync(Usuario usuario)
         {
-            // Filtramos algunos claims internos que se duplican al regenerar
-            var cleanClaims = claims.Where(c => c.Type != "nbf" && c.Type != "exp" && c.Type != "iat").ToList();
-            cleanClaims.Add(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()));
+            var roles = await _userManager.GetRolesAsync(usuario);
+            var claims = new List<Claim>
+            {
+                new Claim("sub", usuario.Id.ToString()),
+                new Claim("jti", Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
+                new Claim(ClaimTypes.Name, $"{usuario.Nombres} {usuario.Apellidos}"),
+                new Claim("DepartamentoId", usuario.DepartamentoId?.ToString() ?? string.Empty)
+            };
+
+            foreach (var rol in roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, rol));
+            }
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JwtSettings:Key"]!));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
             var token = new JwtSecurityToken(
                 issuer: _configuration["JwtSettings:Issuer"],
                 audience: _configuration["JwtSettings:Audience"],
-                claims: cleanClaims,
+                claims: claims,
                 expires: DateTime.UtcNow.AddMinutes(15),
-                signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
+                signingCredentials: creds
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);

@@ -218,3 +218,8 @@ Para las siguientes fases de madurez y endurecimiento de la infraestructura de s
 #### 8.2.6. Cifrado de Datos Personales Sensibles en Reposo (PII / Column Encryption)
 * **Objetivo:** Proteger información sensible del funcionario a nivel de base de datos.
 * **Implementación:** Aplicación de cifrado o enmascaramiento a nivel de columna (Always Encrypted o cifrado simétrico por software) sobre campos como el número de teléfono personal o la cédula de ciudadanía en SQL Server.
+
+#### 8.2.7. Opción "Recordar Sesión" (Remember Me) y Persistencia Dinámica de Sesión
+* **Objetivo:** Permitir al usuario elegir entre mantener su sesión iniciada de manera prolongada en un equipo de confianza o restringirla estrictamente a la jornada laboral/pestaña actual.
+* **Implementación:** * **Estrategia Normal (Checkbox desmarcado):** Las llaves se almacenan en `sessionStorage` con un `RefreshToken` de corta duración (8 a 10 horas). Expirará al cerrar la ventana o al día siguiente.
+  * **Estrategia Recordarme (Checkbox marcado):** Las llaves se almacenan en `localStorage` con un `RefreshToken` extendido (7 a 30 días), manteniendo la sesión activa entre días y fines de semana hasta que el usuario cierre sesión explícitamente.
