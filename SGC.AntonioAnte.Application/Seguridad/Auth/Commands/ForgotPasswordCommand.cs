@@ -1,14 +1,30 @@
-﻿using MediatR;
+﻿using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Identity;
+using SGC.AntonioAnte.Application.Common.Interfaces;
+using SGC.AntonioAnte.Domain.Seguridad.Entities;
+using SGC.AntonioAnte.Shared.Constants; // 🔹 Importamos constantes de auditoría
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using SGC.AntonioAnte.Application.Common.Interfaces;
-using SGC.AntonioAnte.Domain.Seguridad.Entities;
 
-namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword
+namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
 {
-    // Cambiado el tipo de retorno de string a bool por seguridad ISO 27001
+    // 1. COMMAND (record posicional)
+    public record ForgotPasswordCommand(string Email) : IRequest<bool>;
+
+    // 2. VALIDATOR (FluentValidation)
+    public class ForgotPasswordCommandValidator : AbstractValidator<ForgotPasswordCommand>
+    {
+        public ForgotPasswordCommandValidator()
+        {
+            RuleFor(v => v.Email)
+                .NotEmpty().WithMessage("El correo electrónico es obligatorio.")
+                .EmailAddress().WithMessage("El formato del correo electrónico no es válido.");
+        }
+    }
+
+    // 3. HANDLER
     public class ForgotPasswordCommandHandler : IRequestHandler<ForgotPasswordCommand, bool>
     {
         private readonly UserManager<Usuario> _userManager;
@@ -42,10 +58,10 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword
                 throw new Exception("El usuario se encuentra inactivo en el sistema.");
             }
 
-            // Generar el código OTP de 6 dígitos
+            // Generar el código OTP
             var codigoOtp = await _userManager.GeneratePasswordResetTokenAsync(usuario);
 
-            // Plantilla HTML unificada con información del tiempo de expiración (3 horas)
+            // Plantilla HTML unificada de seguridad
             string plantillaHtml = $@"
             <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;'>
                 <div style='background-color: #0f172a; padding: 15px; text-align: center; border-radius: 6px 6px 0 0;'>
@@ -69,13 +85,14 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword
 
             await _emailService.EnviarCorreoAsync(usuario.Email!, "SGC Catastro - Código de Verificación Seguro", plantillaHtml);
 
+            // Registro de auditoría estandarizado
             var auditoria = new Auditoria
             {
                 UsuarioId = usuario.Id,
-                Accion = "SOLICITUD_RECUPERACION_PASSWORD",
+                Accion = AuditActions.SolicitarRecuperacionPassword,
                 Entidad = "Usuario",
                 EntidadId = usuario.Id.ToString(),
-                DatosAdicionales = "Código de verificación OTP de 6 dígitos generado y enviado por correo electrónico.",
+                DatosAdicionales = "Código de verificación OTP generado y enviado por correo electrónico institucional.",
                 DireccionIp = _currentUserService.IpAddress,
                 Navegador = _currentUserService.UserAgent,
                 FechaCreacion = DateTime.UtcNow

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SGC.AntonioAnte.Shared.DTOs.Seguridad
+namespace SGC.AntonioAnte.Shared.DTOs.Common
 {
     public class OperacionResultadoDto
     {

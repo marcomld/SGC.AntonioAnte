@@ -1,23 +1,10 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using SGC.AntonioAnte.Application.Common;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.AddClaim;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.CreateUsuario;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Login;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Logout;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ResetPassword;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Queries;
-using SGC.AntonioAnte.Application.Seguridad.Usuarios;
-using SGC.AntonioAnte.Domain.Seguridad.Entities;
-using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Usuarios;
-using System;
-using System.Threading.Tasks;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.UpdateUsuario;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.CambiarEstadoUsuario;
 

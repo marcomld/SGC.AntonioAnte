@@ -1,4 +1,5 @@
-﻿using MediatR;
+﻿using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
@@ -8,14 +9,30 @@ using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken
+namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
 {
+    // 1. COMMAND (record posicional inmutable)
+    public record RefreshTokenCommand(string AccessToken, string RefreshToken) : IRequest<TokenResponseDto>;
+
+    // 2. VALIDATOR (FluentValidation)
+    public class RefreshTokenCommandValidator : AbstractValidator<RefreshTokenCommand>
+    {
+        public RefreshTokenCommandValidator()
+        {
+            RuleFor(x => x.AccessToken)
+                .NotEmpty().WithMessage("El token de acceso expirado es obligatorio.");
+
+            RuleFor(x => x.RefreshToken)
+                .NotEmpty().WithMessage("El token de refresco es obligatorio.");
+        }
+    }
+
+    // 3. HANDLER
     public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, TokenResponseDto>
     {
         private readonly UserManager<Usuario> _userManager;
@@ -59,13 +76,13 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken
             var parts = storedTokenValue.Split('|');
             if (parts.Length != 2 || parts[0] != request.RefreshToken)
             {
-                await RegistrarAuditoria(usuario.Id, "REFRESH_RECHAZADO", "Token no coincide o está alterado.");
+                await RegistrarAuditoria(usuario.Id, "REFRESH_RECHAZADO", "Token no coincide o está alterado.", cancellationToken);
                 throw new Exception("Refresh Token inválido.");
             }
 
             if (DateTime.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind).ToUniversalTime() <= DateTime.UtcNow)
             {
-                await RegistrarAuditoria(usuario.Id, "REFRESH_RECHAZADO", "Refresh Token expirado.");
+                await RegistrarAuditoria(usuario.Id, "REFRESH_RECHAZADO", "Refresh Token expirado.", cancellationToken);
                 throw new Exception("Su sesión ha expirado completamente. Vuelva a iniciar sesión.");
             }
 
@@ -77,8 +94,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken
             // 4. Actualizar en la base de datos
             await _userManager.RemoveAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken");
             await _userManager.SetAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken", newRefreshTokenValue);
-
-            // Se elimina la auditoría de REFRESH_EXITOSO para evitar saturar la tabla con renovaciones rutinarias.
 
             return new TokenResponseDto { AccessToken = newAccessToken, RefreshToken = newRefreshTokenString };
         }
@@ -137,7 +152,7 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        private async Task RegistrarAuditoria(Guid usuarioId, string accion, string datosAdicionales)
+        private async Task RegistrarAuditoria(Guid usuarioId, string accion, string datosAdicionales, CancellationToken cancellationToken)
         {
             _context.Auditorias.Add(new Auditoria
             {
@@ -150,7 +165,7 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken
                 Navegador = _currentUserService.UserAgent,
                 FechaCreacion = DateTime.UtcNow
             });
-            await _context.SaveChangesAsync(default);
+            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

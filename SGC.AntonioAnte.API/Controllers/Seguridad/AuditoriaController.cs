@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SGC.AntonioAnte.Application.Common.Interfaces;
-using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auditoria;
+using SGC.AntonioAnte.Application.Seguridad.Auditorias.Queries;
 
 namespace SGC.AntonioAnte.API.Controllers.Seguridad
 {
@@ -11,11 +12,11 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
     [Authorize(Roles = "AdminSistemas,SuperAdmin")]
     public class AuditoriaController : ControllerBase
     {
-        private readonly IApplicationDbContext _context;
+        private readonly IMediator _mediator;
 
-        public AuditoriaController(IApplicationDbContext context)
+        public AuditoriaController(IMediator mediator)
         {
-            _context = context;
+            _mediator = mediator;
         }
 
         [HttpGet]
@@ -29,71 +30,8 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
             [FromQuery] int pagina = 1,
             [FromQuery] int registrosPorPagina = 15)
         {
-            var query = _context.Auditorias
-                .Include(a => a.Usuario)
-                .AsNoTracking()
-                .AsQueryable();
-
-            if (desde.HasValue)
-                query = query.Where(a => a.FechaCreacion >= desde.Value.Date);
-
-            if (hasta.HasValue)
-                query = query.Where(a => a.FechaCreacion <= hasta.Value.Date.AddDays(1).AddTicks(-1));
-
-            if (usuarioId.HasValue)
-                query = query.Where(a => a.UsuarioId == usuarioId.Value);
-
-            if (!string.IsNullOrWhiteSpace(accion))
-                query = query.Where(a => a.Accion == accion);
-
-            if (!string.IsNullOrWhiteSpace(entidad))
-                query = query.Where(a => a.Entidad == entidad);
-
-            if (!string.IsNullOrWhiteSpace(busqueda))
-            {
-                string term = busqueda.Trim().ToLower();
-                query = query.Where(a => a.Accion.ToLower().Contains(term) ||
-                                         a.Entidad.ToLower().Contains(term) ||
-                                         a.DireccionIp.Contains(term) ||
-                                         (a.Usuario != null && (a.Usuario.Nombres.ToLower().Contains(term) ||
-                                                                a.Usuario.Apellidos.ToLower().Contains(term) ||
-                                                                a.Usuario.Identificacion.Contains(term) ||
-                                                                a.Usuario.Email.ToLower().Contains(term))));
-            }
-
-            int totalRegistros = await query.CountAsync();
-
-            int paginaAjustada = pagina < 1 ? 1 : pagina;
-            int tamañoAjustado = registrosPorPagina < 5 ? 15 : registrosPorPagina;
-
-            var items = await query
-                .OrderByDescending(a => a.FechaCreacion)
-                .Skip((paginaAjustada - 1) * tamañoAjustado)
-                .Take(tamañoAjustado)
-                .Select(a => new AuditLogResponseDto
-                {
-                    Id = a.Id,
-                    UsuarioId = a.UsuarioId,
-                    NombreUsuario = a.Usuario != null ? $"{a.Usuario.Nombres} {a.Usuario.Apellidos}" : "Sistema / Proceso Automático",
-                    EmailUsuario = a.Usuario != null ? a.Usuario.Email : string.Empty,
-                    IdentificacionUsuario = a.Usuario != null ? a.Usuario.Identificacion : string.Empty,
-                    Accion = a.Accion,
-                    Entidad = a.Entidad,
-                    EntidadId = a.EntidadId,
-                    DireccionIp = a.DireccionIp,
-                    Navegador = a.Navegador,
-                    DatosAdicionales = a.DatosAdicionales ?? string.Empty,
-                    FechaCreacion = a.FechaCreacion
-                })
-                .ToListAsync();
-
-            var resultado = new ResultadoPaginadoAuditDto
-            {
-                Items = items,
-                TotalRegistros = totalRegistros,
-                PaginaActual = paginaAjustada,
-                RegistrosPorPagina = tamañoAjustado
-            };
+            var query = new GetAuditoriasQuery(desde, hasta, usuarioId, accion, entidad, busqueda, pagina, registrosPorPagina);
+            var resultado = await _mediator.Send(query);
 
             return Ok(new { data = resultado, mensaje = "Bitácora consultada correctamente." });
         }

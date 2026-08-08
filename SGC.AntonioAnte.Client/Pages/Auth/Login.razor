@@ -9,8 +9,6 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
 
-
-
 <div class="container-fluid p-0">
     <div class="row g-0 min-vh-100">
 
@@ -51,13 +49,9 @@
                     @if (!string.IsNullOrEmpty(errorMensaje))
                     {
                         <div class="alert @(cuentaBloqueada ? "alert-danger" : "alert-warning") d-flex align-items-center mb-4 border-0 shadow-sm rounded-3 small" role="alert">
-                            <i class="bi @(cuentaBloqueada ? "bi-shield-lock-fill" : "bi-exclamation-triangle-fill") me-2 fs-5"></i>
+                            <i class="bi @(cuentaBloqueada ? "bi-shield-lock-fill" : "bi-exclamation-triangle-fill") me-2 fs-5 flex-shrink-0"></i>
                             <div>
                                 <span>@errorMensaje</span>
-                                @if (cuentaBloqueada)
-                                {
-                                    <strong class="d-block mt-1">Tiempo restante: @FormatearTiempo(segundosRestantes)</strong>
-                                }
                             </div>
                         </div>
                     }
@@ -112,16 +106,12 @@
     </div>
 </div>
 
-<!-- Estilos movidos a Login.razor.css para evitar conflictos con el parser CSS dentro de archivos .razor -->
-
 @code {
     private LoginDto credenciales = new();
     private string errorMensaje = string.Empty;
     private bool procesando = false;
     private bool mostrarPassword = false;
-
     private bool cuentaBloqueada = false;
-    private int segundosRestantes = 0;
 
     private void TogglePassword() => mostrarPassword = !mostrarPassword;
 
@@ -134,7 +124,6 @@
 
         try
         {
-            // Ahora invoca a AuthService.LoginAsync
             var resultado = await AuthService.LoginAsync(credenciales);
 
             if (resultado.Exitoso && resultado.Tokens != null)
@@ -145,7 +134,11 @@
             }
             else if (resultado.CuentaBloqueada)
             {
-                await InicializarBloqueoServidor(resultado.SegundosRestantes);
+                // Calculamos la hora exacta local en que el usuario podrá volver a intentar
+                var horaHabilitacion = DateTime.Now.AddSeconds(resultado.SegundosRestantes).ToString("hh:mm:ss tt");
+
+                cuentaBloqueada = true;
+                errorMensaje = $"Tu cuenta ha sido bloqueada temporalmente por demasiados intentos fallidos. Podrás intentar nuevamente a las {horaHabilitacion}.";
             }
             else
             {
@@ -160,29 +153,5 @@
         {
             procesando = false;
         }
-    }
-
-    private async Task InicializarBloqueoServidor(int segundos)
-    {
-        cuentaBloqueada = true;
-        segundosRestantes = segundos;
-        errorMensaje = "Esta cuenta se encuentra bloqueada temporalmente en la base de datos debido a demasiados intentos fallidos.";
-
-        while (segundosRestantes > 0)
-        {
-            await Task.Delay(1000);
-            segundosRestantes--;
-            StateHasChanged(); // Renderiza de forma asíncrona el segundero reactivo
-        }
-
-        cuentaBloqueada = false;
-        errorMensaje = string.Empty;
-    }
-
-    private string FormatearTiempo(int segundosTotales)
-    {
-        var minutos = segundosTotales / 60;
-        var segundos = segundosTotales % 60;
-        return $"{minutos:D2}:{segundos:D2} min";
     }
 }

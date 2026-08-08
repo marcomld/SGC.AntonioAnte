@@ -21,13 +21,4 @@ namespace SGC.AntonioAnte.Shared.DTOs.Seguridad.Auditoria
         public string DatosAdicionales { get; set; } = string.Empty;
         public DateTime FechaCreacion { get; set; }
     }
-
-    public class ResultadoPaginadoAuditDto
-    {
-        public List<AuditLogResponseDto> Items { get; set; } = new();
-        public int TotalRegistros { get; set; }
-        public int PaginaActual { get; set; }
-        public int RegistrosPorPagina { get; set; }
-        public int TotalPaginas => (int)Math.Ceiling((double)TotalRegistros / (RegistrosPorPagina == 0 ? 1 : RegistrosPorPagina));
-    }
 }

@@ -1,11 +1,7 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Login;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Logout;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ResetPassword;
+using SGC.AntonioAnte.Application.Seguridad.Auth.Commands;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 using System.Threading.Tasks;
 
@@ -25,13 +21,11 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
-            var command = new LoginCommand
-            {
-                Identificacion = dto.Identificacion,
-                Password = dto.Password
-            };
+            // Instanciamos el record posicional en una línea
+            var command = new LoginCommand(dto.Identificacion, dto.Password);
 
             var tokens = await _mediator.Send(command);
+
             return Ok(new
             {
                 Data = tokens,
@@ -42,12 +36,7 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenDto dto)
         {
-            var command = new RefreshTokenCommand
-            {
-                AccessToken = dto.AccessToken,
-                RefreshToken = dto.RefreshToken
-            };
-
+            var command = new RefreshTokenCommand(dto.AccessToken, dto.RefreshToken);
             var tokens = await _mediator.Send(command);
             return Ok(tokens);
         }
@@ -63,26 +52,18 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost("solicitar-recuperacion")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
         {
-            var command = new ForgotPasswordCommand
-            {
-                Email = dto.Email
-            };
-
+            var command = new ForgotPasswordCommand(dto.Email);
             await _mediator.Send(command);
+
             return Ok(new { Mensaje = "Código de verificación (OTP) enviado exitosamente al correo electrónico institucional." });
         }
 
         [HttpPost("restablecer-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
         {
-            var command = new ResetPasswordCommand
-            {
-                Email = dto.Email,
-                Token = dto.Token,
-                NuevaPassword = dto.NuevaPassword
-            };
-
+            var command = new ResetPasswordCommand(dto.Email, dto.Token, dto.NuevaPassword);
             await _mediator.Send(command);
+
             return Ok(new { Mensaje = "Contraseña restablecida exitosamente." });
         }
     }
