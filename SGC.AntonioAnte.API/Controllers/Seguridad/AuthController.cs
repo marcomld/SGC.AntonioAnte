@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Logout;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ResetPassword;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 using System.Threading.Tasks;

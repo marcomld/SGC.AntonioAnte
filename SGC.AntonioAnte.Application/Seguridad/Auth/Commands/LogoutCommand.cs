@@ -2,21 +2,27 @@
 using Microsoft.AspNetCore.Identity;
 using SGC.AntonioAnte.Application.Common.Interfaces;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
+using SGC.AntonioAnte.Shared.Constants;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
-namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Logout
+namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
 {
+    // 1. COMMAND (record posicional sin parámetros)
+    public record LogoutCommand() : IRequest<bool>;
+
+    // 2. HANDLER
     public class LogoutCommandHandler : IRequestHandler<LogoutCommand, bool>
     {
         private readonly UserManager<Usuario> _userManager;
         private readonly ICurrentUserService _currentUserService;
         private readonly IApplicationDbContext _context;
 
-        public LogoutCommandHandler(UserManager<Usuario> userManager, ICurrentUserService currentUserService, IApplicationDbContext context)
+        public LogoutCommandHandler(
+            UserManager<Usuario> userManager,
+            ICurrentUserService currentUserService,
+            IApplicationDbContext context)
         {
             _userManager = userManager;
             _currentUserService = currentUserService;
@@ -34,18 +40,19 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Logout
             // Borramos el token de la tabla Seguridad.UsuarioTokens
             await _userManager.RemoveAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken");
 
-            // Auditoría
+            // Auditoría utilizando constante estandarizada
             _context.Auditorias.Add(new Auditoria
             {
                 UsuarioId = usuario.Id,
-                Accion = "LOGOUT",
+                Accion = AuditActions.Logout,
                 Entidad = "Usuario",
                 EntidadId = usuario.Id.ToString(),
-                DatosAdicionales = "Cierre de sesión manual",
+                DatosAdicionales = "Cierre de sesión manual de usuario",
                 DireccionIp = _currentUserService.IpAddress,
                 Navegador = _currentUserService.UserAgent,
                 FechaCreacion = DateTime.UtcNow
             });
+
             await _context.SaveChangesAsync(cancellationToken);
 
             return true;
