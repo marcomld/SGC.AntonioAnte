@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands.CambiarEstadoDepartamento;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands.DeleteDepartamento;
-using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands.UpdateDepartamento;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Queries;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Departamentos;
 using System;
@@ -53,8 +52,12 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         public async Task<IActionResult> Actualizar([FromRoute] Guid id, [FromBody] CreateDepartamentoDto dto)
         {
             var command = new UpdateDepartamentoCommand { Id = id, Nombre = dto.Nombre, Descripcion = dto.Descripcion };
-            await _mediator.Send(command);
-            return Ok(new { mensaje = "Departamento actualizado correctamente." });
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         [HttpPut("{id:guid}/toggle-status")]
