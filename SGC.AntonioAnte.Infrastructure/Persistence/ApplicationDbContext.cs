@@ -37,7 +37,6 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
         // =========================================================================
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
-            // 🛡️ 1. Rastreamos solo entidades de dominio (Ignoramos Auditoria e Identity Interno)
             var entradasRastreadas = ChangeTracker.Entries()
                 .Where(e => (e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted)
                             && e.Entity is not Auditoria
@@ -46,7 +45,6 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
 
             var nuevasAuditorias = new List<Auditoria>();
 
-            // 🛡️ 2. Propiedades operativas / técnicas que se omiten del Delta
             var propiedadesOmitidas = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "ConcurrencyStamp",
@@ -66,7 +64,6 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
             {
                 string nombreEntidad = entry.Entity.GetType().Name;
 
-                // Si EF Core genera proxies dinámicos, extraemos el nombre base de la clase
                 if (nombreEntidad.Contains("_"))
                     nombreEntidad = nombreEntidad.Split('_')[0];
 
@@ -89,10 +86,13 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
                         datosAdicionales = $"Registro creado: {string.Join(" | ", camposCreados)}";
                         break;
 
-                    // 🔵 2. ACTUALIZADO / UPDATE
+                    // 🔵 2. ACTUALIZADO / UPDATE / CAMBIO DE ESTADO
                     case EntityState.Modified:
                         accion = $"ACTUALIZAR_{nombreEntidad.ToUpper()}";
                         var cambios = new List<string>();
+                        bool esCambioEstadoExclusivo = false;
+                        bool nuevoEstadoActivo = false;
+
                         foreach (var propiedad in entry.Properties)
                         {
                             if (propiedad.IsModified && !propiedadesOmitidas.Contains(propiedad.Metadata.Name))
@@ -103,12 +103,26 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
                                 if (valorAnterior.ToString() != valorNuevo.ToString())
                                 {
                                     cambios.Add($"{propiedad.Metadata.Name}: '{valorAnterior}' -> '{valorNuevo}'");
+
+                                    // Detectamos si cambió 'EstadoActivo'
+                                    if (propiedad.Metadata.Name.Equals("EstadoActivo", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        esCambioEstadoExclusivo = true;
+                                        nuevoEstadoActivo = Convert.ToBoolean(propiedad.CurrentValue);
+                                    }
                                 }
                             }
                         }
 
-                        // Si solo cambiaron propiedades omitidas (ej. contadores de login), se descarta el registro
                         if (!cambios.Any()) continue;
+
+                        // 🎯 Si solo cambió el EstadoActivo, etiquetamos la acción como ACTIVAR o DESACTIVAR
+                        if (cambios.Count == 1 && esCambioEstadoExclusivo)
+                        {
+                            accion = nuevoEstadoActivo
+                                ? $"ACTIVAR_{nombreEntidad.ToUpper()}"
+                                : $"DESACTIVAR_{nombreEntidad.ToUpper()}";
+                        }
 
                         datosAdicionales = $"Cambios aplicados: {string.Join(" | ", cambios)}";
                         break;
@@ -144,7 +158,6 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
             return await base.SaveChangesAsync(cancellationToken);
         }
 
-        // Filtro de tipos de infraestructura interna de Identity
         private static bool EsTablaInternaIdentity(object entity)
         {
             var tipo = entity.GetType();
