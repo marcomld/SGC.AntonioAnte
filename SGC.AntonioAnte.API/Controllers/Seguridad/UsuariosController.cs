@@ -9,7 +9,6 @@ using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.CreateUsuario;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Logout;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ResetPassword;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Queries;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios;

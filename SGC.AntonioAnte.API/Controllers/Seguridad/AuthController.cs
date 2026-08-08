@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Logout;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ResetPassword;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 using System.Threading.Tasks;
@@ -40,12 +39,7 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost("refresh-token")]
         public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenDto dto)
         {
-            var command = new RefreshTokenCommand
-            {
-                AccessToken = dto.AccessToken,
-                RefreshToken = dto.RefreshToken
-            };
-
+            var command = new RefreshTokenCommand(dto.AccessToken, dto.RefreshToken);
             var tokens = await _mediator.Send(command);
             return Ok(tokens);
         }
