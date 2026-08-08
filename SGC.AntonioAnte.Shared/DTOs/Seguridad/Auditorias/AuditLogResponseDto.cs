@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SGC.AntonioAnte.Shared.DTOs.Seguridad.Auditoria
+namespace SGC.AntonioAnte.Shared.DTOs.Seguridad.Auditorias
 {
     public class AuditLogResponseDto
     {

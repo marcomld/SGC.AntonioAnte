@@ -29,71 +29,143 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
-
-            // Escanea y aplica automáticamente TODAS las configuraciones IEntityTypeConfiguration<T>
-            // presentes en la capa Infrastructure
             builder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
         }
 
+        // =========================================================================
+        // INTERCEPTOR DE AUDITORÍA AUTOMÁTICA (DELTA AUDIT)
+        // =========================================================================
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
-            // Interceptamos únicamente las entidades en estado "Modificado" ignorando la propia tabla Auditoria
-            var entidadesModificadas = ChangeTracker.Entries()
-                .Where(e => e.State == EntityState.Modified && e.Entity is not Auditoria)
+            var entradasRastreadas = ChangeTracker.Entries()
+                .Where(e => (e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted)
+                            && e.Entity is not Auditoria
+                            && !EsTablaInternaIdentity(e.Entity))
                 .ToList();
 
             var nuevasAuditorias = new List<Auditoria>();
 
-            // Propiedades de Identity/Técnicas que no queremos registrar en la bitácora
-            var propiedadesOmitidas = new[] { "ConcurrencyStamp", "SecurityStamp", "NormalizedEmail", "NormalizedUserName", "PasswordHash" };
-
-            foreach (var entry in entidadesModificadas)
+            var propiedadesOmitidas = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                var cambios = new List<string>();
+                "ConcurrencyStamp",
+                "SecurityStamp",
+                "NormalizedEmail",
+                "NormalizedUserName",
+                "PasswordHash",
+                "AccessFailedCount",
+                "LockoutEnd",
+                "LockoutEnabled",
+                "TwoFactorEnabled",
+                "PhoneNumberConfirmed",
+                "EmailConfirmed"
+            };
 
-                foreach (var propiedad in entry.Properties)
+            foreach (var entry in entradasRastreadas)
+            {
+                string nombreEntidad = entry.Entity.GetType().Name;
+
+                if (nombreEntidad.Contains("_"))
+                    nombreEntidad = nombreEntidad.Split('_')[0];
+
+                var idPropiedad = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "Id")?.CurrentValue?.ToString() ?? "N/A";
+
+                string accion = string.Empty;
+                string datosAdicionales = string.Empty;
+
+                switch (entry.State)
                 {
-                    if (propiedad.IsModified && !propiedadesOmitidas.Contains(propiedad.Metadata.Name))
-                    {
-                        var valorAnterior = propiedad.OriginalValue ?? "null";
-                        var valorNuevo = propiedad.CurrentValue ?? "null";
+                    // 🟢 1. CREADO / INSERT
+                    case EntityState.Added:
+                        accion = $"CREAR_{nombreEntidad.ToUpper()}";
+                        var camposCreados = entry.Properties
+                            .Where(p => !propiedadesOmitidas.Contains(p.Metadata.Name) && p.CurrentValue != null)
+                            .Select(p => $"{p.Metadata.Name}: '{p.CurrentValue}'");
 
-                        // Solo registramos si el valor en texto realmente cambió
-                        if (valorAnterior.ToString() != valorNuevo.ToString())
+                        if (!camposCreados.Any()) continue;
+
+                        datosAdicionales = $"Registro creado: {string.Join(" | ", camposCreados)}";
+                        break;
+
+                    // 🔵 2. ACTUALIZADO / UPDATE / CAMBIO DE ESTADO
+                    case EntityState.Modified:
+                        accion = $"ACTUALIZAR_{nombreEntidad.ToUpper()}";
+                        var cambios = new List<string>();
+                        bool esCambioEstadoExclusivo = false;
+                        bool nuevoEstadoActivo = false;
+
+                        foreach (var propiedad in entry.Properties)
                         {
-                            cambios.Add($"{propiedad.Metadata.Name}: '{valorAnterior}' -> '{valorNuevo}'");
+                            if (propiedad.IsModified && !propiedadesOmitidas.Contains(propiedad.Metadata.Name))
+                            {
+                                var valorAnterior = propiedad.OriginalValue ?? "null";
+                                var valorNuevo = propiedad.CurrentValue ?? "null";
+
+                                if (valorAnterior.ToString() != valorNuevo.ToString())
+                                {
+                                    cambios.Add($"{propiedad.Metadata.Name}: '{valorAnterior}' -> '{valorNuevo}'");
+
+                                    // Detectamos si cambió 'EstadoActivo'
+                                    if (propiedad.Metadata.Name.Equals("EstadoActivo", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        esCambioEstadoExclusivo = true;
+                                        nuevoEstadoActivo = Convert.ToBoolean(propiedad.CurrentValue);
+                                    }
+                                }
+                            }
                         }
-                    }
+
+                        if (!cambios.Any()) continue;
+
+                        // 🎯 Si solo cambió el EstadoActivo, etiquetamos la acción como ACTIVAR o DESACTIVAR
+                        if (cambios.Count == 1 && esCambioEstadoExclusivo)
+                        {
+                            accion = nuevoEstadoActivo
+                                ? $"ACTIVAR_{nombreEntidad.ToUpper()}"
+                                : $"DESACTIVAR_{nombreEntidad.ToUpper()}";
+                        }
+
+                        datosAdicionales = $"Cambios aplicados: {string.Join(" | ", cambios)}";
+                        break;
+
+                    // 🔴 3. ELIMINADO / DELETE
+                    case EntityState.Deleted:
+                        accion = $"ELIMINAR_{nombreEntidad.ToUpper()}";
+                        var valoresEliminados = entry.Properties
+                            .Where(p => !propiedadesOmitidas.Contains(p.Metadata.Name) && p.OriginalValue != null)
+                            .Select(p => $"{p.Metadata.Name}: '{p.OriginalValue}'");
+                        datosAdicionales = $"Registro eliminado: {string.Join(" | ", valoresEliminados)}";
+                        break;
                 }
 
-                if (cambios.Any())
+                nuevasAuditorias.Add(new Auditoria
                 {
-                    string nombreEntidad = entry.Entity.GetType().Name;
-
-                    // Extraemos la propiedad "Id" dinámicamente sin importar el tipo de entidad
-                    var idPropiedad = entry.Properties.FirstOrDefault(p => p.Metadata.Name == "Id")?.CurrentValue?.ToString() ?? "N/A";
-
-                    nuevasAuditorias.Add(new Auditoria
-                    {
-                        UsuarioId = _currentUserService.UsuarioIdGuid,
-                        Accion = $"ACTUALIZAR_{nombreEntidad.ToUpper()}",
-                        Entidad = nombreEntidad,
-                        EntidadId = idPropiedad,
-                        DatosAdicionales = $"Cambios aplicados: {string.Join(" | ", cambios)}",
-                        DireccionIp = _currentUserService.IpAddress,
-                        Navegador = _currentUserService.UserAgent,
-                        FechaCreacion = DateTime.UtcNow
-                    });
-                }
+                    UsuarioId = _currentUserService.UsuarioIdGuid,
+                    Accion = accion,
+                    Entidad = nombreEntidad,
+                    EntidadId = idPropiedad,
+                    DatosAdicionales = datosAdicionales,
+                    DireccionIp = _currentUserService.IpAddress,
+                    Navegador = _currentUserService.UserAgent,
+                    FechaCreacion = DateTime.UtcNow
+                });
             }
 
-            // Agregamos las auditorías acumuladas al contexto antes de enviar la transacción a la BD
             if (nuevasAuditorias.Any())
             {
                 Auditorias.AddRange(nuevasAuditorias);
             }
 
             return await base.SaveChangesAsync(cancellationToken);
+        }
+
+        private static bool EsTablaInternaIdentity(object entity)
+        {
+            var tipo = entity.GetType();
+            return tipo.Name.StartsWith("IdentityUserToken") ||
+                   tipo.Name.StartsWith("IdentityUserClaim") ||
+                   tipo.Name.StartsWith("IdentityUserLogin") ||
+                   tipo.Name.StartsWith("IdentityRoleClaim") ||
+                   tipo.Name.StartsWith("IdentityUserRole");
         }
     }
 }

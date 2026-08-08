@@ -5,6 +5,7 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Contracts
 {
     public interface IDepartamentoService
     {
+        Task<ResultadoPaginadoDto<DepartamentoDto>?> ObtenerPaginadoAsync(string? busqueda, bool? estadoActivo, int pagina, int registrosPorPagina);
         Task<List<DepartamentoDto>?> ObtenerTodosAsync();
         Task<OperacionResultadoDto> CrearAsync(CreateDepartamentoDto dto);
         Task<OperacionResultadoDto> ActualizarAsync(Guid id, CreateDepartamentoDto dto);
