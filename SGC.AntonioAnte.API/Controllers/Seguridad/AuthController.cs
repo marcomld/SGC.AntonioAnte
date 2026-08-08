@@ -1,7 +1,6 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ResetPassword;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
@@ -54,12 +53,9 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost("solicitar-recuperacion")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
         {
-            var command = new ForgotPasswordCommand
-            {
-                Email = dto.Email
-            };
-
+            var command = new ForgotPasswordCommand(dto.Email);
             await _mediator.Send(command);
+
             return Ok(new { Mensaje = "Código de verificación (OTP) enviado exitosamente al correo electrónico institucional." });
         }
 

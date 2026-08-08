@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using SGC.AntonioAnte.Application.Common;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.AddClaim;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.CreateUsuario;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ResetPassword;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Queries;
