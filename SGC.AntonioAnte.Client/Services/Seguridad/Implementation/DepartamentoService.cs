@@ -114,11 +114,12 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
             var resultado = new OperacionResultadoDto();
             try
             {
-                var respuesta = await _httpClient.PutAsync($"api/v1/seguridad/departamentos/{id}/toggle-status", null);
+                // 🔹 Ruta actualizada a español: cambiar-estado
+                var respuesta = await _httpClient.PutAsync($"api/v1/seguridad/departamentos/{id}/cambiar-estado", null);
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    resultado.Exitoso = true;
-                    return resultado;
+                    var respuestaApi = await respuesta.Content.ReadFromJsonAsync<OperacionResultadoDto>(_jsonOptions);
+                    return respuestaApi ?? OperacionResultadoDto.Exito("Estado del departamento modificado exitosamente.");
                 }
 
                 var contenidoError = await respuesta.Content.ReadAsStringAsync();

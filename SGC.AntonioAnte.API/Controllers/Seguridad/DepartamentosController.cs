@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands;
-using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands.CambiarEstadoDepartamento;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands.DeleteDepartamento;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Queries;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Departamentos;
@@ -60,12 +59,16 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
             return Ok(resultado);
         }
 
-        [HttpPut("{id:guid}/toggle-status")]
+        [HttpPut("{id:guid}/cambiar-estado")]
         public async Task<IActionResult> CambiarEstado([FromRoute] Guid id)
         {
             var command = new CambiarEstadoDepartamentoCommand { Id = id };
-            await _mediator.Send(command);
-            return Ok(new { mensaje = "Estado del departamento modificado exitosamente." });
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         [HttpDelete("{id:guid}")]
