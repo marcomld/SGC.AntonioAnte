@@ -1,8 +1,8 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands.CambiarEstadoDepartamento;
-using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands.CreateDepartamento;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands.DeleteDepartamento;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands.UpdateDepartamento;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Queries;
@@ -41,8 +41,12 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         public async Task<IActionResult> Crear([FromBody] CreateDepartamentoDto dto)
         {
             var command = new CreateDepartamentoCommand { Nombre = dto.Nombre, Descripcion = dto.Descripcion };
-            var id = await _mediator.Send(command);
-            return Ok(new { id, mensaje = "Departamento registrado exitosamente." });
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         [HttpPut("{id:guid}")]
