@@ -384,6 +384,68 @@
         animation: fadeIn 0.25s ease-out;
     }
 
+    /* =========================================================================
+       CLASES PERSONALIZADAS PARA BADGES DE AUDITORÍA (100% LEGIBLES)
+       ========================================================================= */
+    .badge-audit {
+        font-size: 0.72rem !important;
+        font-weight: 700 !important;
+        padding: 0.35em 0.75em !important;
+        border-radius: 50rem !important;
+        display: inline-block;
+        text-align: center;
+        font-family: var(--bs-font-sans-serif);
+    }
+
+    /* 🟢 Crear / Registrar (Verde Esmeralda) */
+    .badge-crear {
+        background-color: #d1fae5 !important;
+        color: #065f46 !important;
+        border: 1px solid #a7f3d0 !important;
+    }
+
+    /* 🔵 Actualizar / Editar (Azul Corporativo) */
+    .badge-actualizar {
+        background-color: #dbeafe !important;
+        color: #1e40af !important;
+        border: 1px solid #bfdbfe !important;
+    }
+
+    /* 🩵 Activar (Cian / Turquesa) */
+    .badge-activar {
+        background-color: #cff4fc !important;
+        color: #055160 !important;
+        border: 1px solid #b6effb !important;
+    }
+
+    /* 🔴 Eliminar / Desactivar / Desasignar (Rojo Intenso) */
+    .badge-eliminar {
+        background-color: #fee2e2 !important;
+        color: #991b1b !important;
+        border: 1px solid #fca5a5 !important;
+    }
+
+    /* 🟣 Asignar / Permisos (Ámbar / Amarillo Fuerte) */
+    .badge-asignar {
+        background-color: #fef3c7 !important;
+        color: #92400e !important;
+        border: 1px solid #fde68a !important;
+    }
+
+    /* 🩶 Login / Logout / Seguridad (Gris Pizarra Oscuro) */
+    .badge-login {
+        background-color: #f1f5f9 !important;
+        color: #334155 !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+
+    /* ⚪ Otros Procesos (Gris Neutro) */
+    .badge-otros {
+        background-color: #f8fafc !important;
+        color: #475569 !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+
     @@keyframes fadeIn {
         from {
             opacity: 0;
@@ -533,30 +595,30 @@
     {
         // 🟢 CREAR / REGISTRAR
         string a when a.StartsWith("CREAR") || a.StartsWith("REGISTRAR")
-            => "bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1 fw-bold small",
+            => "badge-audit badge-crear",
 
-        // 🔵 ACTUALIZAR
+        // 🔵 ACTUALIZAR / EDITAR
         string a when a.StartsWith("ACTUALIZAR") || a.StartsWith("EDITAR")
-            => "bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 fw-bold small",
+            => "badge-audit badge-actualizar",
 
         // 🩵 ACTIVAR
         string a when a.StartsWith("ACTIVAR")
-            => "bg-info-subtle text-info-emphasis border border-info-subtle rounded-pill px-2.5 py-1 fw-bold small",
+            => "badge-audit badge-activar",
 
         // 🔴 ELIMINAR / DESACTIVAR / DESASIGNAR
         string a when a.StartsWith("ELIMINAR") || a.StartsWith("DESACTIVAR") || a.StartsWith("DESASIGNAR")
-            => "bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5 py-1 fw-bold small",
+            => "badge-audit badge-eliminar",
 
         // 🟣 ASIGNAR / PERMISOS
         string a when a.StartsWith("ASIGNAR") || a.Contains("PERMISO") || a.Contains("CLAIM")
-            => "bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2.5 py-1 fw-bold small",
+            => "badge-audit badge-asignar",
 
         // 🩶 LOGIN / LOGOUT / SESIÓN
         string a when a.Contains("LOGIN") || a.Contains("LOGOUT") || a.Contains("PASSWORD") || a.Contains("TOKEN")
-            => "bg-dark-subtle text-dark-emphasis border border-dark-subtle rounded-pill px-2.5 py-1 fw-bold small",
+            => "badge-audit badge-login",
 
         // ⚪ OTROS PROCESOS
-        _ => "bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-2.5 py-1 fw-bold small"
+        _ => "badge-audit badge-otros"
     };
 
     public void Dispose()

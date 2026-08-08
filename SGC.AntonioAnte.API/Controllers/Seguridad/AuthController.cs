@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Login;
+using SGC.AntonioAnte.Application.Seguridad.Auth.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Logout;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ResetPassword;
@@ -25,13 +25,11 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
-            var command = new LoginCommand
-            {
-                Identificacion = dto.Identificacion,
-                Password = dto.Password
-            };
+            // Instanciamos el record posicional en una línea
+            var command = new LoginCommand(dto.Identificacion, dto.Password);
 
             var tokens = await _mediator.Send(command);
+
             return Ok(new
             {
                 Data = tokens,

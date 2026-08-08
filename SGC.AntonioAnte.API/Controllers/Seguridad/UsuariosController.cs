@@ -7,7 +7,7 @@ using SGC.AntonioAnte.Application.Common;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.AddClaim;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.CreateUsuario;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ForgotPassword;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Login;
+using SGC.AntonioAnte.Application.Seguridad.Auth.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.Logout;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.RefreshToken;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ResetPassword;

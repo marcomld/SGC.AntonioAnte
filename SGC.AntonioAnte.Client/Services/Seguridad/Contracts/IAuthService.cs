@@ -1,4 +1,4 @@
-﻿using SGC.AntonioAnte.Shared.DTOs.Seguridad;
+﻿using SGC.AntonioAnte.Shared.DTOs.Common;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 
 namespace SGC.AntonioAnte.Client.Services.Seguridad.Contracts
