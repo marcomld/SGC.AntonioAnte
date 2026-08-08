@@ -28,10 +28,10 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         }
 
         [HttpGet]
-        public async Task<IActionResult> ObtenerTodos()
+        public async Task<IActionResult> GetRoles()
         {
-            var roles = await _mediator.Send(new ObtenerTodosRolesQuery());
-            return Ok(new { data = roles, mensaje = "Catálogo de roles recuperado." });
+            var roles = await _mediator.Send(new GetRolesQuery());
+            return Ok(new { data = roles, mensaje = "Catálogo de roles recuperado exitosamente." });
         }
 
         [HttpPost]
