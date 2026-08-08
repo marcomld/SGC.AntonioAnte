@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands;
-using SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands.DeleteDepartamento;
 using SGC.AntonioAnte.Application.Seguridad.Departamentos.Queries;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Departamentos;
 using System;
@@ -75,8 +74,12 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         public async Task<IActionResult> Eliminar([FromRoute] Guid id)
         {
             var command = new DeleteDepartamentoCommand { Id = id };
-            await _mediator.Send(command);
-            return Ok(new { mensaje = "Departamento eliminado permanentemente." });
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
     }
 }
