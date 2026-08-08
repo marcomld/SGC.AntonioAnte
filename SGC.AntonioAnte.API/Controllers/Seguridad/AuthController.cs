@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands;
-using SGC.AntonioAnte.Application.Seguridad.Auth.Commands.ResetPassword;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 using System.Threading.Tasks;
 
@@ -62,14 +61,9 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost("restablecer-password")]
         public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
         {
-            var command = new ResetPasswordCommand
-            {
-                Email = dto.Email,
-                Token = dto.Token,
-                NuevaPassword = dto.NuevaPassword
-            };
-
+            var command = new ResetPasswordCommand(dto.Email, dto.Token, dto.NuevaPassword);
             await _mediator.Send(command);
+
             return Ok(new { Mensaje = "Contraseña restablecida exitosamente." });
         }
     }
