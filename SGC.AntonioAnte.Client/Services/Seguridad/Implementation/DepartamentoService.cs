@@ -1,10 +1,13 @@
 ﻿using SGC.AntonioAnte.Client.Services.Seguridad.Contracts;
-using SGC.AntonioAnte.Client.Utils;
 using SGC.AntonioAnte.Shared.DTOs.Common;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Departamentos;
+using System;
+using System.Collections.Generic;
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
 {
@@ -19,24 +22,43 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
             _jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         }
 
-        public async Task<List<DepartamentoDto>?> ObtenerTodosAsync()
+        public async Task<ResultadoPaginadoDto<DepartamentoDto>?> ObtenerPaginadoAsync(string? busqueda, bool? estadoActivo, int pagina, int registrosPorPagina)
         {
             try
             {
-                var respuesta = await _httpClient.GetAsync("api/v1/seguridad/departamentos");
+                var queryParams = new List<string>
+                {
+                    $"pagina={pagina}",
+                    $"registrosPorPagina={registrosPorPagina}"
+                };
+
+                if (!string.IsNullOrWhiteSpace(busqueda))
+                    queryParams.Add($"busqueda={Uri.EscapeDataString(busqueda.Trim())}");
+
+                if (estadoActivo.HasValue)
+                    queryParams.Add($"estadoActivo={estadoActivo.Value.ToString().ToLower()}");
+
+                string url = $"api/v1/seguridad/departamentos?{string.Join("&", queryParams)}";
+
+                var respuesta = await _httpClient.GetAsync(url);
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    var resultadoJson = await respuesta.Content.ReadFromJsonAsync<RespuestaApi<List<DepartamentoDto>>>(_jsonOptions);
-                    return resultadoJson?.Data;
+                    return await respuesta.Content.ReadFromJsonAsync<ResultadoPaginadoDto<DepartamentoDto>>(_jsonOptions);
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error al consultar departamentos: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error al consultar departamentos paginados: {ex.Message}");
             }
             return null;
         }
 
+        public async Task<List<DepartamentoDto>?> ObtenerTodosAsync()
+        {
+            // Consulta los departamentos activos para alimentarlos a los comboboxes / selects
+            var resultado = await ObtenerPaginadoAsync(busqueda: null, estadoActivo: true, pagina: 1, registrosPorPagina: 1000);
+            return resultado?.Items;
+        }
         public async Task<OperacionResultadoDto> CrearAsync(CreateDepartamentoDto dto)
         {
             var resultado = new OperacionResultadoDto();
@@ -145,6 +167,8 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
                 var root = doc.RootElement;
                 if (root.TryGetProperty("mensaje", out var propMsg) && !string.IsNullOrWhiteSpace(propMsg.GetString()))
                     return propMsg.GetString()!;
+                if (root.TryGetProperty("detail", out var propDetail) && !string.IsNullOrWhiteSpace(propDetail.GetString()))
+                    return propDetail.GetString()!;
             }
             catch { }
             return contenidoRaw.Trim('"').Trim();

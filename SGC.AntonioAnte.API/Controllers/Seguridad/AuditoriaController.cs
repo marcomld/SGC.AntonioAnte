@@ -7,9 +7,9 @@ using SGC.AntonioAnte.Application.Seguridad.Auditorias.Queries;
 
 namespace SGC.AntonioAnte.API.Controllers.Seguridad
 {
+    [Authorize(Roles = "AdminSistemas,SuperAdmin")]
     [ApiController]
     [Route("api/v1/seguridad/auditoria")]
-    [Authorize(Roles = "AdminSistemas,SuperAdmin")]
     public class AuditoriaController : ControllerBase
     {
         private readonly IMediator _mediator;
@@ -20,9 +20,9 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         }
 
         [HttpGet]
-        public async Task<IActionResult> ConsultarBitacora(
-            [FromQuery] DateTime? desde,
-            [FromQuery] DateTime? hasta,
+        public async Task<IActionResult> GetAuditorias(
+            [FromQuery] DateTime? fechaDesde,
+            [FromQuery] DateTime? fechaHasta,
             [FromQuery] Guid? usuarioId,
             [FromQuery] string? accion,
             [FromQuery] string? entidad,
@@ -30,10 +30,9 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
             [FromQuery] int pagina = 1,
             [FromQuery] int registrosPorPagina = 15)
         {
-            var query = new GetAuditoriasQuery(desde, hasta, usuarioId, accion, entidad, busqueda, pagina, registrosPorPagina);
-            var resultado = await _mediator.Send(query);
-
-            return Ok(new { data = resultado, mensaje = "Bitácora consultada correctamente." });
+            var query = new GetAuditoriasQuery(fechaDesde, fechaHasta, usuarioId, accion, entidad, busqueda, pagina, registrosPorPagina);
+            var result = await _mediator.Send(query);
+            return Ok(result);
         }
     }
 }

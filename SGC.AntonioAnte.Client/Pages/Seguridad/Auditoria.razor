@@ -1,9 +1,10 @@
 ﻿@page "/seguridad/auditoria"
 @attribute [Authorize(Roles = "AdminSistemas,SuperAdmin")]
-@using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auditoria
-@using SGC.AntonioAnte.Shared.DTOs.Seguridad.Usuarios
-@using SGC.AntonioAnte.Client.Services.Seguridad.Contracts
 @using Microsoft.AspNetCore.Authorization
+@using SGC.AntonioAnte.Client.Services.Seguridad.Contracts
+@using SGC.AntonioAnte.Shared.DTOs.Common
+@using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auditorias
+@using SGC.AntonioAnte.Shared.DTOs.Seguridad.Usuarios
 @implements IDisposable
 
 @inject IAuditoriaService AuditoriaService
@@ -459,7 +460,7 @@
 </style>
 
 @code {
-    private ResultadoPaginadoAuditDto? resultadoPaginado;
+    private ResultadoPaginadoDto<AuditLogResponseDto>? resultadoPaginado;
     private List<UsuarioResponseDto>? listaFuncionarios;
     private bool cargando = true;
 

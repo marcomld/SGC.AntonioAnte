@@ -1,17 +1,18 @@
-﻿using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auditoria;
+﻿using SGC.AntonioAnte.Shared.DTOs.Common;
+using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auditorias;
 
 namespace SGC.AntonioAnte.Client.Services.Seguridad.Contracts
 {
     public interface IAuditoriaService
     {
-        Task<ResultadoPaginadoAuditDto?> ConsultarBitacoraAsync(
-            DateTime? desde,
-            DateTime? hasta,
+        Task<ResultadoPaginadoDto<AuditLogResponseDto>?> ConsultarBitacoraAsync(
+            DateTime? fechaDesde,
+            DateTime? fechaHasta,
             Guid? usuarioId,
             string? accion,
             string? entidad,
             string? busqueda,
-            int pagina,
-            int registrosPorPagina);
+            int pagina = 1,
+            int registrosPorPagina = 15);
     }
 }

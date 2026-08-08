@@ -12,9 +12,10 @@ using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.API.Controllers.Seguridad
 {
+
+    [Authorize]
     [ApiController]
     [Route("api/v1/seguridad/departamentos")]
-    [Authorize(Roles = "AdminSistemas,SuperAdmin")]
     public class DepartamentosController : ControllerBase
     {
         private readonly IMediator _mediator;
@@ -25,10 +26,15 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         }
 
         [HttpGet]
-        public async Task<IActionResult> ObtenerTodos()
+        public async Task<IActionResult> ObtenerPaginado(
+            [FromQuery] string? busqueda,
+            [FromQuery] bool? estadoActivo,
+            [FromQuery] int pagina = 1,
+            [FromQuery] int registrosPorPagina = 10)
         {
-            var departamentos = await _mediator.Send(new ObtenerTodosDepartamentosQuery());
-            return Ok(new { data = departamentos, mensaje = "Catálogo de departamentos recuperado." });
+            var query = new GetDepartamentosQuery(busqueda, estadoActivo, pagina, registrosPorPagina);
+            var resultado = await _mediator.Send(query);
+            return Ok(resultado);
         }
 
         [HttpPost]

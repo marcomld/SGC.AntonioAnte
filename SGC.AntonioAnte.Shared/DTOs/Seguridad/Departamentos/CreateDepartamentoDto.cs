@@ -10,7 +10,7 @@ namespace SGC.AntonioAnte.Shared.DTOs.Seguridad.Departamentos
     public class CreateDepartamentoDto
     {
         [Required(ErrorMessage = "El nombre del departamento es obligatorio.")]
-        [StringLength(100, MinimumLength = 3, ErrorMessage = "El nombre debe tener entre 3 y 100 caracteres.")]
+        [StringLength(100, ErrorMessage = "El nombre no puede exceder los 100 caracteres.")]
         public string Nombre { get; set; } = string.Empty;
 
         [StringLength(250, ErrorMessage = "La descripción no puede exceder los 250 caracteres.")]
