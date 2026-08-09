@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosGranulares;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosRol;
-using SGC.AntonioAnte.Application.Seguridad.Roles.Command.CreateRol;
+using SGC.AntonioAnte.Application.Seguridad.Roles.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Commands.AsignarRolUsuario;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Commands.DeleteRol;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Commands.DesasignarRolUsuario;
@@ -38,8 +38,12 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         public async Task<IActionResult> Crear([FromBody] CreateRoleDto dto)
         {
             var command = new CreateRolCommand { Nombre = dto.Nombre, Descripcion = dto.Descripcion };
-            var id = await _mediator.Send(command);
-            return Ok(new { id, mensaje = "Rol registrado exitosamente." });
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         [HttpDelete("{id:guid}")]

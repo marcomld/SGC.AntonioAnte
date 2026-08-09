@@ -2,9 +2,13 @@
 using SGC.AntonioAnte.Client.Utils;
 using SGC.AntonioAnte.Shared.DTOs.Common;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Roles;
+using System;
+using System.Collections.Generic;
 using System.Net;
+using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
 {
@@ -45,12 +49,13 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
                 var respuesta = await _httpClient.PostAsJsonAsync("api/v1/seguridad/roles", nuevoRol);
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    resultado.Exitoso = true;
-                    resultado.Mensaje = "Rol registrado con éxito.";
-                    return resultado;
+                    var respuestaApi = await respuesta.Content.ReadFromJsonAsync<OperacionResultadoDto>(_jsonOptions);
+                    return respuestaApi ?? OperacionResultadoDto.Exito("Rol registrado con éxito.");
                 }
+
+                var contenidoError = await respuesta.Content.ReadAsStringAsync();
                 resultado.Exitoso = false;
-                resultado.Mensaje = await respuesta.Content.ReadAsStringAsync();
+                resultado.Mensaje = ExtraerMensajeError(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
             {
@@ -72,8 +77,10 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
                     resultado.Mensaje = "Rol eliminado correctamente.";
                     return resultado;
                 }
+
+                var contenidoError = await respuesta.Content.ReadAsStringAsync();
                 resultado.Exitoso = false;
-                resultado.Mensaje = await respuesta.Content.ReadAsStringAsync();
+                resultado.Mensaje = ExtraerMensajeError(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
             {
@@ -113,8 +120,10 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
                     resultado.Mensaje = "Permisos del rol actualizados correctamente.";
                     return resultado;
                 }
+
+                var contenidoError = await respuesta.Content.ReadAsStringAsync();
                 resultado.Exitoso = false;
-                resultado.Mensaje = await respuesta.Content.ReadAsStringAsync();
+                resultado.Mensaje = ExtraerMensajeError(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
             {
@@ -154,8 +163,10 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
                     resultado.Mensaje = "Permisos del funcionario actualizados correctamente.";
                     return resultado;
                 }
+
+                var contenidoError = await respuesta.Content.ReadAsStringAsync();
                 resultado.Exitoso = false;
-                resultado.Mensaje = await respuesta.Content.ReadAsStringAsync();
+                resultado.Mensaje = ExtraerMensajeError(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
             {
@@ -177,8 +188,10 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
                     resultado.Mensaje = "Rol asignado correctamente.";
                     return resultado;
                 }
+
+                var contenidoError = await respuesta.Content.ReadAsStringAsync();
                 resultado.Exitoso = false;
-                resultado.Mensaje = await respuesta.Content.ReadAsStringAsync();
+                resultado.Mensaje = ExtraerMensajeError(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
             {
@@ -200,8 +213,10 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
                     resultado.Mensaje = "Rol removido correctamente.";
                     return resultado;
                 }
+
+                var contenidoError = await respuesta.Content.ReadAsStringAsync();
                 resultado.Exitoso = false;
-                resultado.Mensaje = await respuesta.Content.ReadAsStringAsync();
+                resultado.Mensaje = ExtraerMensajeError(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
             {
@@ -209,6 +224,23 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
                 resultado.Mensaje = $"Error de red: {ex.Message}";
             }
             return resultado;
+        }
+
+        // 🔹 MÉTODO AUXILIAR PARA EXTRAER EL MENSAJE DE ERROR
+        private static string ExtraerMensajeError(string contenidoRaw, HttpStatusCode statusCode)
+        {
+            if (string.IsNullOrWhiteSpace(contenidoRaw)) return $"Error HTTP {(int)statusCode}.";
+            try
+            {
+                using var doc = JsonDocument.Parse(contenidoRaw);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("mensaje", out var propMsg) && !string.IsNullOrWhiteSpace(propMsg.GetString()))
+                    return propMsg.GetString()!;
+                if (root.TryGetProperty("detail", out var propDetail) && !string.IsNullOrWhiteSpace(propDetail.GetString()))
+                    return propDetail.GetString()!;
+            }
+            catch { }
+            return contenidoRaw.Trim('"').Trim();
         }
     }
 }
