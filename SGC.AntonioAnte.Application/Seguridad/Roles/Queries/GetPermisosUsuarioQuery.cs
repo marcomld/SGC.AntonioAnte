@@ -6,29 +6,21 @@ using SGC.AntonioAnte.Shared.DTOs.Seguridad.Roles;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Application.Seguridad.Roles.Queries
 {
-    public class ObtenerPermisosUsuarioQuery : IRequest<List<PermissionDto>>
-    {
-        public Guid UsuarioId { get; set; }
+    // 1. QUERY (record posicional e inmutable)
+    public record GetPermisosUsuarioQuery(Guid Id) : IRequest<List<PermissionDto>>;
 
-        public ObtenerPermisosUsuarioQuery() { }
-
-        public ObtenerPermisosUsuarioQuery(Guid usuarioId)
-        {
-            UsuarioId = usuarioId;
-        }
-    }
-
-    public class ObtenerPermisosUsuarioQueryHandler : IRequestHandler<ObtenerPermisosUsuarioQuery, List<PermissionDto>>
+    // 2. HANDLER
+    public class GetPermisosUsuarioQueryHandler : IRequestHandler<GetPermisosUsuarioQuery, List<PermissionDto>>
     {
         private readonly UserManager<Usuario> _userManager;
         private readonly RoleManager<Rol> _roleManager;
 
-        public ObtenerPermisosUsuarioQueryHandler(
+        public GetPermisosUsuarioQueryHandler(
             UserManager<Usuario> userManager,
             RoleManager<Rol> roleManager)
         {
@@ -36,16 +28,18 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Queries
             _roleManager = roleManager;
         }
 
-        public async Task<List<PermissionDto>> Handle(ObtenerPermisosUsuarioQuery request, CancellationToken cancellationToken)
+        public async Task<List<PermissionDto>> Handle(GetPermisosUsuarioQuery request, CancellationToken cancellationToken)
         {
-            var usuario = await _userManager.FindByIdAsync(request.UsuarioId.ToString());
+            var usuario = await _userManager.FindByIdAsync(request.Id.ToString());
             if (usuario == null)
-                throw new Exception("El funcionario especificado no existe.");
+            {
+                return new List<PermissionDto>();
+            }
 
             // 1. Obtener catálogo maestro estático
             var catalogo = Permissions.ObtenerCatalogoMaestro();
 
-            // 2. Obtener claims heredados por los roles del usuario
+            // 2. Obtener claims heredados por los roles asignados al funcionario
             var rolesUsuario = await _userManager.GetRolesAsync(usuario);
             var claimsHeredadosRoles = new Dictionary<string, string>(); // Key: ValorClaim, Value: NombreRol
 
@@ -65,14 +59,14 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Queries
                 }
             }
 
-            // 3. Obtener claims directos en la tabla UsuarioClaims
+            // 3. Obtener claims directos/excepciones guardados en UsuarioClaims
             var claimsDirectosUsuario = await _userManager.GetClaimsAsync(usuario);
             var valoresClaimsDirectos = claimsDirectosUsuario.Select(c => c.Value).ToHashSet();
 
-            // 4. Cruzar el catálogo para la UI
+            // 4. Cruzar el catálogo maestro para armar la matriz UI
             foreach (var permiso in catalogo)
             {
-                // ¿Heredado por rol?
+                // ¿Heredado por algún rol asignado?
                 if (claimsHeredadosRoles.TryGetValue(permiso.ValorClaim, out string? rolOrigen))
                 {
                     permiso.EsHeredadoDeRol = true;
@@ -80,7 +74,7 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Queries
                     permiso.EstaActivo = true;
                 }
 
-                // ¿Asignado directamente al usuario?
+                // ¿Asignado directamente al usuario como excepción?
                 if (valoresClaimsDirectos.Contains(permiso.ValorClaim))
                 {
                     permiso.EstaActivo = true;

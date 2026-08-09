@@ -37,7 +37,7 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost]
         public async Task<IActionResult> Crear([FromBody] CreateDepartamentoDto dto)
         {
-            var command = new CreateDepartamentoCommand { Nombre = dto.Nombre, Descripcion = dto.Descripcion };
+            var command = new CreateDepartamentoCommand(dto.Nombre, dto.Descripcion);
             var resultado = await _mediator.Send(command);
 
             if (!resultado.Exitoso)
@@ -49,7 +49,7 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPut("{id:guid}")]
         public async Task<IActionResult> Actualizar([FromRoute] Guid id, [FromBody] CreateDepartamentoDto dto)
         {
-            var command = new UpdateDepartamentoCommand { Id = id, Nombre = dto.Nombre, Descripcion = dto.Descripcion };
+            var command = new UpdateDepartamentoCommand(id, dto.Nombre, dto.Descripcion);
             var resultado = await _mediator.Send(command);
 
             if (!resultado.Exitoso)
@@ -61,7 +61,7 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPut("{id:guid}/cambiar-estado")]
         public async Task<IActionResult> CambiarEstado([FromRoute] Guid id)
         {
-            var command = new CambiarEstadoDepartamentoCommand { Id = id };
+            var command = new CambiarEstadoDepartamentoCommand(id);
             var resultado = await _mediator.Send(command);
 
             if (!resultado.Exitoso)
@@ -73,7 +73,7 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Eliminar([FromRoute] Guid id)
         {
-            var command = new DeleteDepartamentoCommand { Id = id };
+            var command = new DeleteDepartamentoCommand(id);
             var resultado = await _mediator.Send(command);
 
             if (!resultado.Exitoso)

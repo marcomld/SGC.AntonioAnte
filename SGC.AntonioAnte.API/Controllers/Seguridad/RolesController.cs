@@ -1,12 +1,8 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosGranulares;
-using SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosRol;
-using SGC.AntonioAnte.Application.Seguridad.Roles.Command.CreateRol;
-using SGC.AntonioAnte.Application.Seguridad.Roles.Commands.AsignarRolUsuario;
-using SGC.AntonioAnte.Application.Seguridad.Roles.Commands.DeleteRol;
-using SGC.AntonioAnte.Application.Seguridad.Roles.Commands.DesasignarRolUsuario;
+using SGC.AntonioAnte.Application.Seguridad.Roles.Command;
+using SGC.AntonioAnte.Application.Seguridad.Roles.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Queries;
 
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Roles;
@@ -28,48 +24,77 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         }
 
         [HttpGet]
-        public async Task<IActionResult> ObtenerTodos()
+        public async Task<IActionResult> GetRoles()
         {
-            var roles = await _mediator.Send(new ObtenerTodosRolesQuery());
-            return Ok(new { data = roles, mensaje = "Catálogo de roles recuperado." });
+            var roles = await _mediator.Send(new GetRolesQuery());
+            return Ok(new { data = roles, mensaje = "Catálogo de roles recuperado exitosamente." });
         }
 
         [HttpPost]
         public async Task<IActionResult> Crear([FromBody] CreateRoleDto dto)
         {
-            var command = new CreateRolCommand { Nombre = dto.Nombre, Descripcion = dto.Descripcion };
-            var id = await _mediator.Send(command);
-            return Ok(new { id, mensaje = "Rol registrado exitosamente." });
+            var command = new CreateRolCommand(dto.Nombre, dto.Descripcion);
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
+        }
+
+        [HttpPut("{id:guid}")]
+        public async Task<IActionResult> Actualizar([FromRoute] Guid id, [FromBody] CreateRoleDto dto)
+        {
+            var command = new UpdateRolCommand(id, dto.Nombre, dto.Descripcion);
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Eliminar([FromRoute] Guid id)
         {
-            await _mediator.Send(new DeleteRolCommand(id));
-            return Ok(new { mensaje = "Rol eliminado permanentemente." });
+            var command = new DeleteRolCommand(id);
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         [HttpPost("asignar-usuario")]
         public async Task<IActionResult> AsignarRolUsuario([FromBody] AssignRoleDto dto)
         {
-            var command = new AsignarRolUsuarioCommand { UsuarioId = dto.UsuarioId, NombreRol = dto.NombreRol };
-            await _mediator.Send(command);
-            return Ok(new { mensaje = "Rol asignado correctamente al funcionario." });
+            var command = new AsignarRolUsuarioCommand(dto.UsuarioId, dto.NombreRol);
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         [HttpPost("desasignar-usuario")]
         public async Task<IActionResult> DesasignarRolUsuario([FromBody] AssignRoleDto dto)
         {
-            var command = new DesasignarRolUsuarioCommand { UsuarioId = dto.UsuarioId, NombreRol = dto.NombreRol };
-            await _mediator.Send(command);
-            return Ok(new { mensaje = "Rol removido correctamente del funcionario." });
+            var command = new DesasignarRolUsuarioCommand(dto.UsuarioId, dto.NombreRol);
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
-        // GET: api/v1/seguridad/roles/{rolId}/permisos (Para Roles.razor)
-        [HttpGet("{rolId:guid}/permisos")]
-        public async Task<IActionResult> ObtenerPermisosRol([FromRoute] Guid rolId)
+        // GET: api/v1/seguridad/roles/{id}/permisos (Para Roles.razor)
+        [HttpGet("{id:guid}/permisos")]
+        public async Task<IActionResult> ObtenerPermisosRol([FromRoute] Guid id)
         {
-            var permisos = await _mediator.Send(new ObtenerPermisosRolQuery(rolId));
+            var permisos = await _mediator.Send(new GetPermisosRolQuery(id));
             return Ok(new { data = permisos, mensaje = "Matriz de permisos del rol recuperada." });
         }
 
@@ -77,20 +102,20 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost("permisos")]
         public async Task<IActionResult> AsignarPermisosRol([FromBody] RolePermissionDto dto)
         {
-            var command = new AsignarPermisosRolCommand
-            {
-                RolId = dto.RolId,
-                Permisos = dto.Permisos
-            };
-            await _mediator.Send(command);
-            return Ok(new { mensaje = "Permisos del rol actualizados correctamente." });
+            var command = new AsignarPermisosRolCommand(dto.RolId, dto.Permisos);
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
-        // GET: api/v1/seguridad/roles/usuarios/{usuarioId}/permisos (Para Usuarios.razor)
-        [HttpGet("usuarios/{usuarioId:guid}/permisos")]
-        public async Task<IActionResult> ObtenerPermisosUsuario([FromRoute] Guid usuarioId)
+        // GET: api/v1/seguridad/roles/usuarios/{id}/permisos (Para Usuarios.razor)
+        [HttpGet("usuarios/{id:guid}/permisos")]
+        public async Task<IActionResult> ObtenerPermisosUsuario([FromRoute] Guid id)
         {
-            var permisos = await _mediator.Send(new ObtenerPermisosUsuarioQuery(usuarioId));
+            var permisos = await _mediator.Send(new GetPermisosUsuarioQuery(id));
             return Ok(new { data = permisos, mensaje = "Permisos del funcionario recuperados." });
         }
 
@@ -98,13 +123,13 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost("usuarios/permisos")]
         public async Task<IActionResult> AsignarPermisosUsuario([FromBody] RolePermissionDto dto)
         {
-            var command = new AsignarPermisosGranularesCommand
-            {
-                UsuarioId = dto.RolId,
-                Permisos = dto.Permisos
-            };
-            await _mediator.Send(command);
-            return Ok(new { mensaje = "Permisos especiales del funcionario actualizados." });
+            var command = new AsignarPermisosGranularesCommand(dto.RolId, dto.Permisos);
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
     }
 }

@@ -8,6 +8,7 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Contracts
         // GESTIÓN DE ROLES
         Task<List<RoleResponseDto>?> ObtenerTodosLosRolesAsync();
         Task<OperacionResultadoDto> CrearRolAsync(CreateRoleDto nuevoRol);
+        Task<OperacionResultadoDto> ActualizarRolAsync(Guid id, CreateRoleDto rolDto);
         Task<OperacionResultadoDto> EliminarRolAsync(Guid id);
 
         // PERMISOS DE ROL (Roles.razor)

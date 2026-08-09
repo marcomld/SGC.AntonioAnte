@@ -6,46 +6,40 @@ using SGC.AntonioAnte.Shared.DTOs.Seguridad.Roles;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Application.Seguridad.Roles.Queries
 {
-    public class ObtenerPermisosRolQuery : IRequest<List<PermissionDto>>
-    {
-        public Guid RolId { get; set; }
+    // 1. QUERY (record posicional)
+    public record GetPermisosRolQuery(Guid Id) : IRequest<List<PermissionDto>>;
 
-        public ObtenerPermisosRolQuery() { }
-
-        public ObtenerPermisosRolQuery(Guid rolId)
-        {
-            RolId = rolId;
-        }
-    }
-
-    public class ObtenerPermisosRolQueryHandler : IRequestHandler<ObtenerPermisosRolQuery, List<PermissionDto>>
+    // 2. HANDLER
+    public class GetPermisosRolQueryHandler : IRequestHandler<GetPermisosRolQuery, List<PermissionDto>>
     {
         private readonly RoleManager<Rol> _roleManager;
 
-        public ObtenerPermisosRolQueryHandler(RoleManager<Rol> roleManager)
+        public GetPermisosRolQueryHandler(RoleManager<Rol> roleManager)
         {
             _roleManager = roleManager;
         }
 
-        public async Task<List<PermissionDto>> Handle(ObtenerPermisosRolQuery request, CancellationToken cancellationToken)
+        public async Task<List<PermissionDto>> Handle(GetPermisosRolQuery request, CancellationToken cancellationToken)
         {
-            var rol = await _roleManager.FindByIdAsync(request.RolId.ToString());
+            var rol = await _roleManager.FindByIdAsync(request.Id.ToString());
             if (rol == null)
-                throw new Exception("El rol especificado no existe.");
+            {
+                return new List<PermissionDto>();
+            }
 
-            // 1. Obtener catálogo maestro de permisos estático
+            // 1. Catálogo maestro de permisos estático
             var catalogo = Permissions.ObtenerCatalogoMaestro();
 
-            // 2. Obtener claims actuales guardados en la tabla RolClaims
+            // 2. Claims actuales guardados en RolClaims
             var claimsActualesRol = await _roleManager.GetClaimsAsync(rol);
             var valoresClaimsRol = claimsActualesRol.Select(c => c.Value).ToHashSet();
 
-            // 3. Cruzar catálogo para marcar estado activo
+            // 3. Cruzar con el catálogo
             foreach (var permiso in catalogo)
             {
                 if (valoresClaimsRol.Contains(permiso.ValorClaim))
