@@ -72,7 +72,7 @@
 
                 <div class="col-12 col-md-1 d-flex align-items-end mt-auto pt-2 pt-md-0">
                     <button class="btn btn-light text-danger border w-100 py-2 fw-semibold" @onclick="LimpiarFiltros" title="Limpiar Filtros">
-                        <i class="bi bi-eraser-fill me-1"></i> Limpiar
+                        <i class="bi bi-eraser-fill me-1"></i>
                     </button>
                 </div>
             </div>
@@ -196,10 +196,10 @@
 
                     <nav>
                         <ul class="pagination pagination-sm mb-0">
-                            <li class="page-item @(paginaActual == 1 ? "disabled" : "")">
+                            <li class="page-item @(resultadoPaginado.TienePaginaAnterior ? "" : "disabled")">
                                 <button class="page-item-btn" @onclick="() => IrAPagina(1)" title="Primera página"><i class="bi bi-chevron-double-left"></i></button>
                             </li>
-                            <li class="page-item @(paginaActual == 1 ? "disabled" : "")">
+                            <li class="page-item @(resultadoPaginado.TienePaginaAnterior ? "" : "disabled")">
                                 <button class="page-item-btn" @onclick="() => IrAPagina(paginaActual - 1)" title="Anterior"><i class="bi bi-chevron-left"></i></button>
                             </li>
 
@@ -207,10 +207,10 @@
                                 <span class="page-item-text">Página @paginaActual de @resultadoPaginado.TotalPaginas</span>
                             </li>
 
-                            <li class="page-item @(paginaActual >= resultadoPaginado.TotalPaginas ? "disabled" : "")">
+                            <li class="page-item @(resultadoPaginado.TienePaginaSiguiente ? "" : "disabled")">
                                 <button class="page-item-btn" @onclick="() => IrAPagina(paginaActual + 1)" title="Siguiente"><i class="bi bi-chevron-right"></i></button>
                             </li>
-                            <li class="page-item @(paginaActual >= resultadoPaginado.TotalPaginas ? "disabled" : "")">
+                            <li class="page-item @(resultadoPaginado.TienePaginaSiguiente ? "" : "disabled")">
                                 <button class="page-item-btn" @onclick="() => IrAPagina(resultadoPaginado.TotalPaginas)" title="Última página"><i class="bi bi-chevron-double-right"></i></button>
                             </li>
                         </ul>
@@ -340,9 +340,9 @@
         transition: background-color 0.15s ease;
     }
 
-    .custom-table tbody tr:hover {
-        background-color: #f8fafc;
-    }
+        .custom-table tbody tr:hover {
+            background-color: #f8fafc;
+        }
 
     .page-item-btn {
         background: #ffffff;
@@ -354,10 +354,10 @@
         transition: all 0.15s ease;
     }
 
-    .page-item-btn:hover:not(:disabled) {
-        background-color: #f1f5f9;
-        color: #2563eb;
-    }
+        .page-item-btn:hover:not(:disabled) {
+            background-color: #f1f5f9;
+            color: #2563eb;
+        }
 
     .page-item-text {
         padding: 0.35rem 0.75rem;
@@ -385,9 +385,6 @@
         animation: fadeIn 0.25s ease-out;
     }
 
-    /* =========================================================================
-       CLASES PERSONALIZADAS PARA BADGES DE AUDITORÍA (100% LEGIBLES)
-       ========================================================================= */
     .badge-audit {
         font-size: 0.72rem !important;
         font-weight: 700 !important;
@@ -398,49 +395,42 @@
         font-family: var(--bs-font-sans-serif);
     }
 
-    /* 🟢 Crear / Registrar (Verde Esmeralda) */
     .badge-crear {
         background-color: #d1fae5 !important;
         color: #065f46 !important;
         border: 1px solid #a7f3d0 !important;
     }
 
-    /* 🔵 Actualizar / Editar (Azul Corporativo) */
     .badge-actualizar {
         background-color: #dbeafe !important;
         color: #1e40af !important;
         border: 1px solid #bfdbfe !important;
     }
 
-    /* 🩵 Activar (Cian / Turquesa) */
     .badge-activar {
         background-color: #cff4fc !important;
         color: #055160 !important;
         border: 1px solid #b6effb !important;
     }
 
-    /* 🔴 Eliminar / Desactivar / Desasignar (Rojo Intenso) */
     .badge-eliminar {
         background-color: #fee2e2 !important;
         color: #991b1b !important;
         border: 1px solid #fca5a5 !important;
     }
 
-    /* 🟣 Asignar / Permisos (Ámbar / Amarillo Fuerte) */
     .badge-asignar {
         background-color: #fef3c7 !important;
         color: #92400e !important;
         border: 1px solid #fde68a !important;
     }
 
-    /* 🩶 Login / Logout / Seguridad (Gris Pizarra Oscuro) */
     .badge-login {
         background-color: #f1f5f9 !important;
         color: #334155 !important;
         border: 1px solid #cbd5e1 !important;
     }
 
-    /* ⚪ Otros Procesos (Gris Neutro) */
     .badge-otros {
         background-color: #f8fafc !important;
         color: #475569 !important;
@@ -452,6 +442,7 @@
             opacity: 0;
             transform: translateY(5px);
         }
+
         to {
             opacity: 1;
             transform: translateY(0);
@@ -464,13 +455,13 @@
     private List<UsuarioResponseDto>? listaFuncionarios;
     private bool cargando = true;
 
-    // Filtros (Inicializados vacíos por defecto)
+    // Filtros
     private string busquedaRapida = string.Empty;
     private DateTime? filtroDesde = null;
     private DateTime? filtroHasta = null;
     private string filtroUsuarioIdStr = string.Empty;
 
-    // Debounce Timer para búsqueda en tiempo real
+    // Timer Debounce
     private System.Timers.Timer? debounceTimer;
 
     // Paginación
@@ -506,7 +497,6 @@
         cargando = false;
     }
 
-    // 🚀 Búsqueda en tiempo real con Debounce (~350ms)
     private void OnInputBusqueda(ChangeEventArgs e)
     {
         busquedaRapida = e.Value?.ToString() ?? string.Empty;
@@ -528,7 +518,6 @@
         debounceTimer.Start();
     }
 
-    // 🚀 Actualización instantánea al cambiar la Fecha Desde
     private async Task OnCambiarFechaDesde(ChangeEventArgs e)
     {
         if (DateTime.TryParse(e.Value?.ToString(), out DateTime fecha))
@@ -540,7 +529,6 @@
         await CargarBitacora();
     }
 
-    // 🚀 Actualización instantánea al cambiar la Fecha Hasta
     private async Task OnCambiarFechaHasta(ChangeEventArgs e)
     {
         if (DateTime.TryParse(e.Value?.ToString(), out DateTime fecha))
@@ -552,7 +540,6 @@
         await CargarBitacora();
     }
 
-    // 🚀 Actualización instantánea al seleccionar un Funcionario
     private async Task OnCambiarFuncionario(ChangeEventArgs e)
     {
         filtroUsuarioIdStr = e.Value?.ToString() ?? string.Empty;
@@ -594,31 +581,12 @@
 
     private string GetBadgeAccion(string accion) => accion.ToUpper() switch
     {
-        // 🟢 CREAR / REGISTRAR
-        string a when a.StartsWith("CREAR") || a.StartsWith("REGISTRAR")
-            => "badge-audit badge-crear",
-
-        // 🔵 ACTUALIZAR / EDITAR
-        string a when a.StartsWith("ACTUALIZAR") || a.StartsWith("EDITAR")
-            => "badge-audit badge-actualizar",
-
-        // 🩵 ACTIVAR
-        string a when a.StartsWith("ACTIVAR")
-            => "badge-audit badge-activar",
-
-        // 🔴 ELIMINAR / DESACTIVAR / DESASIGNAR
-        string a when a.StartsWith("ELIMINAR") || a.StartsWith("DESACTIVAR") || a.StartsWith("DESASIGNAR")
-            => "badge-audit badge-eliminar",
-
-        // 🟣 ASIGNAR / PERMISOS
-        string a when a.StartsWith("ASIGNAR") || a.Contains("PERMISO") || a.Contains("CLAIM")
-            => "badge-audit badge-asignar",
-
-        // 🩶 LOGIN / LOGOUT / SESIÓN
-        string a when a.Contains("LOGIN") || a.Contains("LOGOUT") || a.Contains("PASSWORD") || a.Contains("TOKEN")
-            => "badge-audit badge-login",
-
-        // ⚪ OTROS PROCESOS
+        string a when a.StartsWith("CREAR") || a.StartsWith("REGISTRAR") => "badge-audit badge-crear",
+        string a when a.StartsWith("ACTUALIZAR") || a.StartsWith("EDITAR") => "badge-audit badge-actualizar",
+        string a when a.StartsWith("ACTIVAR") => "badge-audit badge-activar",
+        string a when a.StartsWith("ELIMINAR") || a.StartsWith("DESACTIVAR") || a.StartsWith("DESASIGNAR") => "badge-audit badge-eliminar",
+        string a when a.StartsWith("ASIGNAR") || a.Contains("PERMISO") || a.Contains("CLAIM") => "badge-audit badge-asignar",
+        string a when a.Contains("LOGIN") || a.Contains("LOGOUT") || a.Contains("PASSWORD") || a.Contains("TOKEN") => "badge-audit badge-login",
         _ => "badge-audit badge-otros"
     };
 

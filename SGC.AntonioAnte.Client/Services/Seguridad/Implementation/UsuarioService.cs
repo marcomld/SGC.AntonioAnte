@@ -19,22 +19,44 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
             _jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         }
 
-        public async Task<List<UsuarioResponseDto>?> ObtenerTodosLosUsuariosAsync()
+        public async Task<ResultadoPaginadoDto<UsuarioResponseDto>?> ObtenerUsuariosPaginadosAsync(
+            string? busqueda,
+            bool? estadoActivo,
+            Guid? departamentoId,
+            int pagina = 1,
+            int registrosPorPagina = 10)
         {
             try
             {
-                var respuesta = await _httpClient.GetAsync("api/v1/seguridad/usuarios");
+                var url = $"api/v1/seguridad/usuarios?pagina={pagina}&registrosPorPagina={registrosPorPagina}";
+
+                if (!string.IsNullOrWhiteSpace(busqueda))
+                    url += $"&busqueda={Uri.EscapeDataString(busqueda)}";
+
+                if (estadoActivo.HasValue)
+                    url += $"&estadoActivo={estadoActivo.Value}";
+
+                if (departamentoId.HasValue && departamentoId != Guid.Empty)
+                    url += $"&departamentoId={departamentoId.Value}";
+
+                var respuesta = await _httpClient.GetAsync(url);
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    var resultadoJson = await respuesta.Content.ReadFromJsonAsync<RespuestaApi<List<UsuarioResponseDto>>>(_jsonOptions);
-                    return resultadoJson?.Data;
+                    return await respuesta.Content.ReadFromJsonAsync<ResultadoPaginadoDto<UsuarioResponseDto>>(_jsonOptions);
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error al consultar nómina: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error al consultar nómina paginada: {ex.Message}");
             }
             return null;
+        }
+
+        // Método sin paginación para modales (compatibilidad)
+        public async Task<List<UsuarioResponseDto>?> ObtenerTodosLosUsuariosAsync()
+        {
+            var resPaginado = await ObtenerUsuariosPaginadosAsync(null, null, null, 1, 1000);
+            return resPaginado?.Datos;
         }
 
         public async Task<OperacionResultadoDto> RegistrarFuncionarioAsync(CreateUsuarioDto nuevoUsuario)

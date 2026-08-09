@@ -23,17 +23,16 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         }
 
         [HttpGet]
-        public async Task<IActionResult> ObtenerTodos()
+        public async Task<IActionResult> ObtenerPaginado(
+            [FromQuery] string? busqueda,
+            [FromQuery] bool? estadoActivo,
+            [FromQuery] Guid? departamentoId,
+            [FromQuery] int pagina = 1,
+            [FromQuery] int registrosPorPagina = 10)
         {
-            var query = new ObtenerTodosUsuariosQuery();
+            var query = new GetUsuariosQuery(busqueda, estadoActivo, departamentoId, pagina, registrosPorPagina);
             var resultado = await _mediator.Send(query);
-
-            if (resultado.IsSuccess)
-            {
-                return Ok(new { data = resultado.Value, mensaje = "Nómina de funcionarios recuperada." });
-            }
-
-            return BadRequest(new { mensaje = "No se pudo consultar la nómina." });
+            return Ok(resultado);
         }
 
         [HttpPost]
