@@ -1,11 +1,10 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SGC.AntonioAnte.Application.Seguridad.Roles.Command;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosGranulares;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosRol;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Commands;
-using SGC.AntonioAnte.Application.Seguridad.Roles.Commands.AsignarRolUsuario;
-using SGC.AntonioAnte.Application.Seguridad.Roles.Commands.DesasignarRolUsuario;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Queries;
 
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Roles;
@@ -60,17 +59,25 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost("asignar-usuario")]
         public async Task<IActionResult> AsignarRolUsuario([FromBody] AssignRoleDto dto)
         {
-            var command = new AsignarRolUsuarioCommand { UsuarioId = dto.UsuarioId, NombreRol = dto.NombreRol };
-            await _mediator.Send(command);
-            return Ok(new { mensaje = "Rol asignado correctamente al funcionario." });
+            var command = new AsignarRolUsuarioCommand(dto.UsuarioId, dto.NombreRol);
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         [HttpPost("desasignar-usuario")]
         public async Task<IActionResult> DesasignarRolUsuario([FromBody] AssignRoleDto dto)
         {
-            var command = new DesasignarRolUsuarioCommand { UsuarioId = dto.UsuarioId, NombreRol = dto.NombreRol };
-            await _mediator.Send(command);
-            return Ok(new { mensaje = "Rol removido correctamente del funcionario." });
+            var command = new DesasignarRolUsuarioCommand(dto.UsuarioId, dto.NombreRol);
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         // GET: api/v1/seguridad/roles/{rolId}/permisos (Para Roles.razor)

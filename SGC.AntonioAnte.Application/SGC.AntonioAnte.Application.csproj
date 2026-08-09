@@ -19,4 +19,9 @@
     <ProjectReference Include="..\SGC.AntonioAnte.Shared\SGC.AntonioAnte.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Seguridad\Roles\Command\AsignarRolUsuario\" />
+    <Folder Include="Seguridad\Roles\Command\DesasignarRolUsuario\" />
+  </ItemGroup>
+
 </Project>
