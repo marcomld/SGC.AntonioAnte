@@ -65,6 +65,30 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
             return resultado;
         }
 
+        public async Task<OperacionResultadoDto> ActualizarRolAsync(Guid id, CreateRoleDto rolDto)
+        {
+            var resultado = new OperacionResultadoDto();
+            try
+            {
+                var respuesta = await _httpClient.PutAsJsonAsync($"api/v1/seguridad/roles/{id}", rolDto);
+                if (respuesta.IsSuccessStatusCode)
+                {
+                    var respuestaApi = await respuesta.Content.ReadFromJsonAsync<OperacionResultadoDto>(_jsonOptions);
+                    return respuestaApi ?? OperacionResultadoDto.Exito("Rol actualizado correctamente.");
+                }
+
+                var contenidoError = await respuesta.Content.ReadAsStringAsync();
+                resultado.Exitoso = false;
+                resultado.Mensaje = ExtraerMensajeError(contenidoError, respuesta.StatusCode);
+            }
+            catch (Exception ex)
+            {
+                resultado.Exitoso = false;
+                resultado.Mensaje = $"Error de red: {ex.Message}";
+            }
+            return resultado;
+        }
+
         public async Task<OperacionResultadoDto> EliminarRolAsync(Guid id)
         {
             var resultado = new OperacionResultadoDto();

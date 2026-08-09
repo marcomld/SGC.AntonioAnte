@@ -42,6 +42,18 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
             return Ok(resultado);
         }
 
+        [HttpPut("{id:guid}")]
+        public async Task<IActionResult> Actualizar([FromRoute] Guid id, [FromBody] CreateRoleDto dto)
+        {
+            var command = new UpdateRolCommand(id, dto.Nombre, dto.Descripcion);
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
+        }
+
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Eliminar([FromRoute] Guid id)
         {
