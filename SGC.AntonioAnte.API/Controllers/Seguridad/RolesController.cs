@@ -5,7 +5,6 @@ using SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosGranula
 using SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosRol;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Commands.AsignarRolUsuario;
-using SGC.AntonioAnte.Application.Seguridad.Roles.Commands.DeleteRol;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Commands.DesasignarRolUsuario;
 using SGC.AntonioAnte.Application.Seguridad.Roles.Queries;
 
@@ -37,7 +36,7 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost]
         public async Task<IActionResult> Crear([FromBody] CreateRoleDto dto)
         {
-            var command = new CreateRolCommand { Nombre = dto.Nombre, Descripcion = dto.Descripcion };
+            var command = new CreateRolCommand(dto.Nombre, dto.Descripcion);
             var resultado = await _mediator.Send(command);
 
             if (!resultado.Exitoso)
@@ -49,8 +48,13 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpDelete("{id:guid}")]
         public async Task<IActionResult> Eliminar([FromRoute] Guid id)
         {
-            await _mediator.Send(new DeleteRolCommand(id));
-            return Ok(new { mensaje = "Rol eliminado permanentemente." });
+            var command = new DeleteRolCommand(id);
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         [HttpPost("asignar-usuario")]
