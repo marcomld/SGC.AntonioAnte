@@ -8,16 +8,17 @@ using SGC.AntonioAnte.Shared.DTOs.Common;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Roles;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command
+namespace SGC.AntonioAnte.Application.Seguridad.Roles.Commands
 {
-    // 1. COMMAND (record posicional)
+    // 1. COMMAND
     public record AsignarPermisosGranularesCommand(Guid UsuarioId, List<PermissionDto> Permisos) : IRequest<OperacionResultadoDto>;
 
-    // 2. VALIDATOR (FluentValidation)
+    // 2. VALIDATOR
     public class AsignarPermisosGranularesCommandValidator : AbstractValidator<AsignarPermisosGranularesCommand>
     {
         public AsignarPermisosGranularesCommandValidator()
@@ -58,9 +59,9 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command
                 return OperacionResultadoDto.Fallo("El funcionario especificado no existe.");
             }
 
-            // 1. Obtener todos los claims que el usuario YA hereda por sus roles
+            // 1. Obtener todos los claims que el usuario YA hereda por sus roles asignados
             var rolesUsuario = await _userManager.GetRolesAsync(usuario);
-            var claimsHeredados = new HashSet<string>();
+            var claimsHeredadosRoles = new HashSet<string>();
 
             foreach (var nombreRol in rolesUsuario)
             {
@@ -70,41 +71,59 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command
                     var claimsRol = await _roleManager.GetClaimsAsync(rol);
                     foreach (var c in claimsRol)
                     {
-                        claimsHeredados.Add(c.Value);
+                        claimsHeredadosRoles.Add(c.Value);
                     }
                 }
             }
 
-            // 2. Limpiar la tabla UsuarioClaims para este usuario
+            // 2. Obtener los claims directos (excepciones) actuales en UsuarioClaims
             var claimsDirectosActuales = await _userManager.GetClaimsAsync(usuario);
+            var oldDirectClaimsSet = claimsDirectosActuales.Select(c => c.Value).ToHashSet();
+
+            // 3. Filtrar los nuevos claims directos (OMITIENDO los que ya vienen heredados por rol)
+            var newDirectClaimsSet = request.Permisos?
+                .Select(p => p.ValorClaim)
+                .Where(v => !string.IsNullOrWhiteSpace(v) && !claimsHeredadosRoles.Contains(v))
+                .ToHashSet() ?? new HashSet<string>();
+
+            // 4. 🎯 Cálculo de Delta (Diferencias de permisos directos)
+            var agregados = newDirectClaimsSet.Except(oldDirectClaimsSet).ToList();
+            var removidos = oldDirectClaimsSet.Except(newDirectClaimsSet).ToList();
+
+            if (!agregados.Any() && !removidos.Any())
+            {
+                return OperacionResultadoDto.Exito($"No se detectaron cambios en las excepciones de permisos del funcionario '{usuario.Nombres} {usuario.Apellidos}'.");
+            }
+
+            // 5. Reemplazar la tabla UsuarioClaims para este usuario
             if (claimsDirectosActuales.Count > 0)
             {
                 await _userManager.RemoveClaimsAsync(usuario, claimsDirectosActuales);
             }
 
-            // 3. Insertar ÚNICAMENTE los permisos directos que NO están en los roles del usuario
-            int cantidadExcepciones = 0;
-            if (request.Permisos != null)
+            foreach (var valClaim in newDirectClaimsSet)
             {
-                foreach (var perm in request.Permisos)
-                {
-                    if (claimsHeredados.Contains(perm.ValorClaim))
-                        continue;
-
-                    var nuevoClaim = new Claim(Permissions.ClaimType, perm.ValorClaim);
-                    var resAdd = await _userManager.AddClaimAsync(usuario, nuevoClaim);
-                    if (resAdd.Succeeded) cantidadExcepciones++;
-                }
+                await _userManager.AddClaimAsync(usuario, new Claim(Permissions.ClaimType, valClaim));
             }
 
-            // 4. Auditoría de cambios
+            // 6. Formatear mensaje detallado de auditoría
+            var detallesAuditoria = new List<string>();
+            if (agregados.Any())
+                detallesAuditoria.Add($"Agregados (+{agregados.Count}): [{string.Join(", ", agregados)}]");
+
+            if (removidos.Any())
+                detallesAuditoria.Add($"Removidos (-{removidos.Count}): [{string.Join(", ", removidos)}]");
+
+            string datosAdicionales = $"Permisos especiales de '{usuario.Nombres} {usuario.Apellidos}' modificadas: {string.Join(" | ", detallesAuditoria)}";
+
+            // 7. Guardar auditoría
             _context.Auditorias.Add(new Auditoria
             {
                 UsuarioId = _currentUserService.UsuarioIdGuid,
                 Accion = "ACTUALIZAR_PERMISOS_DIRECTOS_USUARIO",
                 Entidad = "Usuario",
                 EntidadId = usuario.Id.ToString(),
-                DatosAdicionales = $"Se asignaron {cantidadExcepciones} permisos granulares especiales directos para '{usuario.Nombres} {usuario.Apellidos}'.",
+                DatosAdicionales = datosAdicionales,
                 DireccionIp = _currentUserService.IpAddress,
                 Navegador = _currentUserService.UserAgent,
                 FechaCreacion = DateTime.UtcNow

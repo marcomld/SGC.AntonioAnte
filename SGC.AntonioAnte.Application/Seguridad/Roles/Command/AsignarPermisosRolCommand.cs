@@ -8,16 +8,17 @@ using SGC.AntonioAnte.Shared.DTOs.Common;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Roles;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command
+namespace SGC.AntonioAnte.Application.Seguridad.Roles.Commands
 {
-    // 1. COMMAND (record posicional)
+    // 1. COMMAND
     public record AsignarPermisosRolCommand(Guid RolId, List<PermissionDto> Permisos) : IRequest<OperacionResultadoDto>;
 
-    // 2. VALIDATOR (FluentValidation)
+    // 2. VALIDATOR
     public class AsignarPermisosRolCommandValidator : AbstractValidator<AsignarPermisosRolCommand>
     {
         public AsignarPermisosRolCommandValidator()
@@ -55,33 +56,55 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command
                 return OperacionResultadoDto.Fallo("El rol especificado no existe.");
             }
 
-            // 1. Limpiar claims anteriores del rol
+            // 1. Obtener claims actuales en base de datos
             var claimsActuales = await _roleManager.GetClaimsAsync(rol);
+            var oldClaimsSet = claimsActuales.Select(c => c.Value).ToHashSet();
+
+            // 2. Obtener claims solicitados desde la interfaz UI
+            var newClaimsSet = request.Permisos?
+                .Select(p => p.ValorClaim)
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .ToHashSet() ?? new HashSet<string>();
+
+            // 3. 🎯 Cálculo de Delta (Diferencias exactas)
+            var agregados = newClaimsSet.Except(oldClaimsSet).ToList();
+            var removidos = oldClaimsSet.Except(newClaimsSet).ToList();
+
+            // Si no cambió absolutamente nada, evitamos escrituras innecesarias
+            if (!agregados.Any() && !removidos.Any())
+            {
+                return OperacionResultadoDto.Exito($"No se detectaron cambios en los permisos del rol '{rol.Name}'.");
+            }
+
+            // 4. Reemplazar claims en la tabla RolClaims
             foreach (var claim in claimsActuales)
             {
                 await _roleManager.RemoveClaimAsync(rol, claim);
             }
 
-            // 2. Asignar los nuevos claims seleccionados
-            int cantidadAsignada = 0;
-            if (request.Permisos != null)
+            foreach (var valClaim in newClaimsSet)
             {
-                foreach (var perm in request.Permisos)
-                {
-                    var nuevoClaim = new Claim(Permissions.ClaimType, perm.ValorClaim);
-                    var resAdd = await _roleManager.AddClaimAsync(rol, nuevoClaim);
-                    if (resAdd.Succeeded) cantidadAsignada++;
-                }
+                await _roleManager.AddClaimAsync(rol, new Claim(Permissions.ClaimType, valClaim));
             }
 
-            // 3. Auditoría de cambios
+            // 5. Formatear mensaje detallado para la bitácora
+            var detallesAuditoria = new List<string>();
+            if (agregados.Any())
+                detallesAuditoria.Add($"Agregados (+{agregados.Count}): [{string.Join(", ", agregados)}]");
+
+            if (removidos.Any())
+                detallesAuditoria.Add($"Removidos (-{removidos.Count}): [{string.Join(", ", removidos)}]");
+
+            string datosAdicionales = $"Modificación en rol '{rol.Name}': {string.Join(" | ", detallesAuditoria)}";
+
+            // 6. Guardar auditoría
             _context.Auditorias.Add(new Auditoria
             {
                 UsuarioId = _currentUserService.UsuarioIdGuid,
                 Accion = "ACTUALIZAR_PERMISOS_ROL",
                 Entidad = "Rol",
                 EntidadId = rol.Id.ToString(),
-                DatosAdicionales = $"Se actualizaron los permisos del rol '{rol.Name}'. Total asignados: {cantidadAsignada}.",
+                DatosAdicionales = datosAdicionales,
                 DireccionIp = _currentUserService.IpAddress,
                 Navegador = _currentUserService.UserAgent,
                 FechaCreacion = DateTime.UtcNow
