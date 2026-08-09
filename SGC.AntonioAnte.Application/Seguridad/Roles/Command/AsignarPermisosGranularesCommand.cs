@@ -1,25 +1,37 @@
-﻿using MediatR;
+﻿using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Identity;
 using SGC.AntonioAnte.Application.Common.Interfaces;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using SGC.AntonioAnte.Shared.Constants;
+using SGC.AntonioAnte.Shared.DTOs.Common;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Roles;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
-namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosGranulares
+namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command
 {
-    public class AsignarPermisosGranularesCommand : IRequest<bool>
+    // 1. COMMAND (record posicional)
+    public record AsignarPermisosGranularesCommand(Guid UsuarioId, List<PermissionDto> Permisos) : IRequest<OperacionResultadoDto>;
+
+    // 2. VALIDATOR (FluentValidation)
+    public class AsignarPermisosGranularesCommandValidator : AbstractValidator<AsignarPermisosGranularesCommand>
     {
-        public Guid UsuarioId { get; set; }
-        public List<PermissionDto> Permisos { get; set; } = new();
+        public AsignarPermisosGranularesCommandValidator()
+        {
+            RuleFor(v => v.UsuarioId)
+                .NotEmpty().WithMessage("El identificador del funcionario es obligatorio.");
+
+            RuleFor(v => v.Permisos)
+                .NotNull().WithMessage("La lista de permisos no puede ser nula.");
+        }
     }
 
-    public class AsignarPermisosGranularesCommandHandler : IRequestHandler<AsignarPermisosGranularesCommand, bool>
+    // 3. HANDLER
+    public class AsignarPermisosGranularesCommandHandler : IRequestHandler<AsignarPermisosGranularesCommand, OperacionResultadoDto>
     {
         private readonly UserManager<Usuario> _userManager;
         private readonly RoleManager<Rol> _roleManager;
@@ -38,11 +50,13 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosGra
             _currentUserService = currentUserService;
         }
 
-        public async Task<bool> Handle(AsignarPermisosGranularesCommand request, CancellationToken cancellationToken)
+        public async Task<OperacionResultadoDto> Handle(AsignarPermisosGranularesCommand request, CancellationToken cancellationToken)
         {
             var usuario = await _userManager.FindByIdAsync(request.UsuarioId.ToString());
             if (usuario == null)
-                throw new Exception("El funcionario no existe.");
+            {
+                return OperacionResultadoDto.Fallo("El funcionario especificado no existe.");
+            }
 
             // 1. Obtener todos los claims que el usuario YA hereda por sus roles
             var rolesUsuario = await _userManager.GetRolesAsync(usuario);
@@ -70,15 +84,17 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosGra
 
             // 3. Insertar ÚNICAMENTE los permisos directos que NO están en los roles del usuario
             int cantidadExcepciones = 0;
-            foreach (var perm in request.Permisos)
+            if (request.Permisos != null)
             {
-                // Si el permiso ya viene heredado del rol, OMITIR guardarlo en UsuarioClaims
-                if (claimsHeredados.Contains(perm.ValorClaim))
-                    continue;
+                foreach (var perm in request.Permisos)
+                {
+                    if (claimsHeredados.Contains(perm.ValorClaim))
+                        continue;
 
-                var nuevoClaim = new Claim(Permissions.ClaimType, perm.ValorClaim);
-                var resAdd = await _userManager.AddClaimAsync(usuario, nuevoClaim);
-                if (resAdd.Succeeded) cantidadExcepciones++;
+                    var nuevoClaim = new Claim(Permissions.ClaimType, perm.ValorClaim);
+                    var resAdd = await _userManager.AddClaimAsync(usuario, nuevoClaim);
+                    if (resAdd.Succeeded) cantidadExcepciones++;
+                }
             }
 
             // 4. Auditoría de cambios
@@ -95,7 +111,7 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosGra
             });
 
             await _context.SaveChangesAsync(cancellationToken);
-            return true;
+            return OperacionResultadoDto.Exito($"Permisos especiales actualizados correctamente para '{usuario.Nombres} {usuario.Apellidos}'.");
         }
     }
 }

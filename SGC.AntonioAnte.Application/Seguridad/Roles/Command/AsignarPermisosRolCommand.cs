@@ -1,27 +1,37 @@
-﻿using MediatR;
+﻿using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Identity;
 using SGC.AntonioAnte.Application.Common.Interfaces;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using SGC.AntonioAnte.Shared.Constants;
+using SGC.AntonioAnte.Shared.DTOs.Common;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Roles;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
-namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosRol
+namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command
 {
-    // COMMAND
-    public class AsignarPermisosRolCommand : IRequest<bool>
+    // 1. COMMAND (record posicional)
+    public record AsignarPermisosRolCommand(Guid RolId, List<PermissionDto> Permisos) : IRequest<OperacionResultadoDto>;
+
+    // 2. VALIDATOR (FluentValidation)
+    public class AsignarPermisosRolCommandValidator : AbstractValidator<AsignarPermisosRolCommand>
     {
-        public Guid RolId { get; set; }
-        public List<PermissionDto> Permisos { get; set; } = new();
+        public AsignarPermisosRolCommandValidator()
+        {
+            RuleFor(v => v.RolId)
+                .NotEmpty().WithMessage("El identificador del rol es obligatorio.");
+
+            RuleFor(v => v.Permisos)
+                .NotNull().WithMessage("La lista de permisos no puede ser nula.");
+        }
     }
 
-    // HANDLER
-    public class AsignarPermisosRolCommandHandler : IRequestHandler<AsignarPermisosRolCommand, bool>
+    // 3. HANDLER
+    public class AsignarPermisosRolCommandHandler : IRequestHandler<AsignarPermisosRolCommand, OperacionResultadoDto>
     {
         private readonly RoleManager<Rol> _roleManager;
         private readonly IApplicationDbContext _context;
@@ -37,11 +47,13 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosRol
             _currentUserService = currentUserService;
         }
 
-        public async Task<bool> Handle(AsignarPermisosRolCommand request, CancellationToken cancellationToken)
+        public async Task<OperacionResultadoDto> Handle(AsignarPermisosRolCommand request, CancellationToken cancellationToken)
         {
             var rol = await _roleManager.FindByIdAsync(request.RolId.ToString());
             if (rol == null)
-                throw new Exception("El rol especificado no existe.");
+            {
+                return OperacionResultadoDto.Fallo("El rol especificado no existe.");
+            }
 
             // 1. Limpiar claims anteriores del rol
             var claimsActuales = await _roleManager.GetClaimsAsync(rol);
@@ -52,11 +64,14 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosRol
 
             // 2. Asignar los nuevos claims seleccionados
             int cantidadAsignada = 0;
-            foreach (var perm in request.Permisos)
+            if (request.Permisos != null)
             {
-                var nuevoClaim = new Claim(Permissions.ClaimType, perm.ValorClaim);
-                var resAdd = await _roleManager.AddClaimAsync(rol, nuevoClaim);
-                if (resAdd.Succeeded) cantidadAsignada++;
+                foreach (var perm in request.Permisos)
+                {
+                    var nuevoClaim = new Claim(Permissions.ClaimType, perm.ValorClaim);
+                    var resAdd = await _roleManager.AddClaimAsync(rol, nuevoClaim);
+                    if (resAdd.Succeeded) cantidadAsignada++;
+                }
             }
 
             // 3. Auditoría de cambios
@@ -73,7 +88,7 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Command.AsignarPermisosRol
             });
 
             await _context.SaveChangesAsync(cancellationToken);
-            return true;
+            return OperacionResultadoDto.Exito($"Matriz de permisos del rol '{rol.Name}' actualizada correctamente.");
         }
     }
 }
