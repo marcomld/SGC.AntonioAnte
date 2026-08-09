@@ -10,7 +10,6 @@
 
 <div class="container-fluid py-4 animate-fade-in">
 
-    <!-- ENCABEZADO -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
         <div>
             <h2 class="h2 fw-bold text-dark mb-1">
@@ -24,7 +23,6 @@
         </button>
     </div>
 
-    <!-- TOAST AUTOMÁTICO FLOTANTE -->
     @if (!string.IsNullOrEmpty(feedbackMensaje))
     {
         <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1090;">
@@ -39,7 +37,6 @@
         </div>
     }
 
-    <!-- CARGANDO... -->
     @if (cargando)
     {
         <div class="text-center py-5 my-5">
@@ -49,7 +46,6 @@
     }
     else
     {
-        <!-- TARJETAS DE ROLES -->
         <div class="row g-4">
             @foreach (var role in roles)
             {
@@ -81,9 +77,14 @@
 
                             @if (role.Nombre != "AdminSistemas" && role.Nombre != "SuperAdmin")
                             {
-                                <button class="btn btn-link text-muted p-0 hover-danger" @onclick="() => SolicitarEliminarRol(role)" title="Eliminar Rol">
-                                    <i class="bi bi-trash fs-5"></i>
-                                </button>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button class="btn btn-link text-muted p-0 hover-primary" @onclick="() => AbrirModalEditarRol(role)" title="Editar Rol">
+                                        <i class="bi bi-pencil fs-5"></i>
+                                    </button>
+                                    <button class="btn btn-link text-muted p-0 hover-danger" @onclick="() => SolicitarEliminarRol(role)" title="Eliminar Rol">
+                                        <i class="bi bi-trash fs-5"></i>
+                                    </button>
+                                </div>
                             }
                         </div>
 
@@ -127,11 +128,9 @@
     }
 </div>
 
-<!-- MODAL 1: CREAR ROL -->
 @if (mostrarModalCrear)
 {
     <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1070;">
-        <!-- Eliminado modal-sm -->
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg border-0 rounded-4">
                 <div class="modal-header border-bottom-0 pb-0">
@@ -152,7 +151,6 @@
                             <ValidationMessage For="@(() => modeloNuevoRol.Descripcion)" class="text-danger small mt-1" />
                         </div>
 
-                        <!-- Botones horizontales alineados a la derecha -->
                         <div class="d-flex justify-content-end gap-2 mt-4">
                             <button type="button" class="btn btn-light fw-semibold text-muted" @onclick="CerrarModales">Cancelar</button>
                             <button type="submit" class="btn btn-primary fw-semibold shadow-sm px-4" disabled="@procesando">
@@ -173,7 +171,49 @@
     </div>
 }
 
-<!-- MODAL 2: PERMISOS GRANULARES -->
+@if (mostrarModalEditar)
+{
+    <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1070;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-4">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark"><i class="bi bi-pencil-square text-primary me-2"></i>Editar Rol</h5>
+                    <button type="button" class="btn-close" @onclick="CerrarModales"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <EditForm Model="@modeloEditarRol" OnValidSubmit="EjecutarEditarRol">
+                        <DataAnnotationsValidator />
+                        <div class="form-floating mb-3">
+                            <InputText id="txtNombreRolEdit" class="form-control" @bind-Value="modeloEditarRol.Nombre" placeholder="Nombre" disabled="@procesando" />
+                            <label for="txtNombreRolEdit">Nombre del Rol</label>
+                            <ValidationMessage For="@(() => modeloEditarRol.Nombre)" class="text-danger small mt-1" />
+                        </div>
+                        <div class="form-floating mb-4">
+                            <InputText id="txtDescRolEdit" class="form-control" @bind-Value="modeloEditarRol.Descripcion" placeholder="Descripción" disabled="@procesando" />
+                            <label for="txtDescRolEdit">Descripción / Función</label>
+                            <ValidationMessage For="@(() => modeloEditarRol.Descripcion)" class="text-danger small mt-1" />
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-light fw-semibold text-muted" @onclick="CerrarModales">Cancelar</button>
+                            <button type="submit" class="btn btn-primary fw-semibold shadow-sm px-4" disabled="@procesando">
+                                @if (procesando)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span> <span>Guardando...</span>
+                                }
+                                else
+                                {
+                                    <span>Guardar Cambios</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @if (mostrarModalPermisos && rolSeleccionado != null)
 {
     <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1075;">
@@ -261,7 +301,6 @@
     </div>
 }
 
-<!-- MODAL 3: ASIGNAR / QUITAR USUARIOS -->
 @if (mostrarModalAsignar && rolSeleccionado != null)
 {
     <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1075;">
@@ -315,11 +354,9 @@
     </div>
 }
 
-<!-- MODAL 4: CONFIRMAR ACCIÓN USUARIO -->
 @if (usuarioParaAccion != null && rolSeleccionado != null)
 {
     <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1080;">
-        <!-- Eliminado modal-sm -->
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg rounded-4 border-0">
                 <div class="modal-body text-center p-4">
@@ -333,7 +370,6 @@
                         @(esModoAsignar ? "Asignarás" : "Quitarás") el rol <strong>@rolSeleccionado.Nombre</strong> <br> al funcionario <strong>@usuarioParaAccion.Nombres @usuarioParaAccion.Apellidos</strong>.
                     </p>
 
-                    <!-- Botones horizontales y centrados -->
                     <div class="d-flex justify-content-center gap-3 mt-4">
                         <button class="btn btn-light fw-semibold text-muted px-4" @onclick="() => usuarioParaAccion = null">Cancelar</button>
                         <button class="btn @(esModoAsignar ? "btn-success" : "btn-warning") fw-semibold shadow-sm px-4" @onclick="EjecutarAccionUsuario">Sí, Confirmar</button>
@@ -344,11 +380,9 @@
     </div>
 }
 
-<!-- MODAL 5: CONFIRMAR ELIMINAR ROL -->
 @if (rolAEliminar != null)
 {
     <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1085;">
-        <!-- Eliminado modal-sm -->
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content shadow-lg rounded-4 border-0">
                 <div class="modal-body text-center p-4">
@@ -362,7 +396,6 @@
                         Se eliminará permanentemente <strong>@rolAEliminar.Nombre</strong> y se revocará de todos los usuarios asignados.
                     </p>
 
-                    <!-- Botones horizontales y centrados -->
                     <div class="d-flex justify-content-center gap-3 mt-4">
                         <button class="btn btn-light fw-semibold text-muted px-4" @onclick="() => rolAEliminar = null">Cancelar</button>
                         <button class="btn btn-danger fw-semibold shadow-sm px-4" @onclick="EjecutarEliminarRol">Sí, Eliminar</button>
@@ -403,6 +436,10 @@
         align-items: center;
         justify-content: center;
         box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.25);
+    }
+
+    .hover-primary:hover {
+        color: #2563eb !important;
     }
 
     .hover-danger:hover {
@@ -472,11 +509,14 @@
 
     // Modales
     private bool mostrarModalCrear = false;
+    private bool mostrarModalEditar = false;
     private bool mostrarModalPermisos = false;
     private bool mostrarModalAsignar = false;
 
     // Modelos
     private CreateRoleDto modeloNuevoRol = new();
+    private CreateRoleDto modeloEditarRol = new();
+    private Guid idRolEditar;
     private RoleResponseDto? rolSeleccionado;
     private RoleResponseDto? rolAEliminar;
     private UsuarioResponseDto? usuarioParaAccion;
@@ -515,6 +555,7 @@
         }
     }
 
+    // --- CREAR ROL ---
     private void AbrirModalCrearRol() { modeloNuevoRol = new(); mostrarModalCrear = true; }
 
     private async Task EjecutarCrearRol()
@@ -531,6 +572,33 @@
         procesando = false;
     }
 
+    // --- EDITAR ROL ---
+    private void AbrirModalEditarRol(RoleResponseDto role)
+    {
+        idRolEditar = role.Id;
+        modeloEditarRol = new CreateRoleDto
+        {
+            Nombre = role.Nombre,
+            Descripcion = role.Descripcion
+        };
+        mostrarModalEditar = true;
+    }
+
+    private async Task EjecutarEditarRol()
+    {
+        procesando = true;
+        var resultado = await RoleService.ActualizarRolAsync(idRolEditar, modeloEditarRol);
+        if (resultado.Exitoso)
+        {
+            MostrarExito(resultado.Mensaje ?? "Rol actualizado correctamente.");
+            CerrarModales();
+            await CargarDatos();
+        }
+        else MostrarError(resultado.Mensaje ?? "No se pudo actualizar el rol.");
+        procesando = false;
+    }
+
+    // --- ELIMINAR ROL ---
     private void SolicitarEliminarRol(RoleResponseDto role) { rolAEliminar = role; }
 
     private async Task EjecutarEliminarRol()
@@ -660,6 +728,7 @@
     private void CerrarModales()
     {
         mostrarModalCrear = false;
+        mostrarModalEditar = false;
         mostrarModalPermisos = false;
         mostrarModalAsignar = false;
         rolAEliminar = null;
