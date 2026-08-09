@@ -3,20 +3,15 @@ using MediatR;
 using Microsoft.AspNetCore.Identity;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using SGC.AntonioAnte.Shared.DTOs.Common;
-using System;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Application.Seguridad.Roles.Commands
 {
-    // 1. COMMAND
-    public class CreateRolCommand : IRequest<OperacionResultadoDto>
-    {
-        public string Nombre { get; set; } = string.Empty;
-        public string Descripcion { get; set; } = string.Empty;
-    }
+    // 1. COMMAND (record posicional e inmutable)
+    public record CreateRolCommand(string Nombre, string Descripcion) : IRequest<OperacionResultadoDto>;
 
-    // 2. VALIDATOR (FluentValidation)
+    // 2. VALIDATOR
     public class CreateRolCommandValidator : AbstractValidator<CreateRolCommand>
     {
         public CreateRolCommandValidator()
@@ -45,7 +40,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Commands
         {
             var nombreTrim = request.Nombre.Trim();
 
-            // 🛡️ Control de duplicados
             var rolExistente = await _roleManager.RoleExistsAsync(nombreTrim);
             if (rolExistente)
             {
@@ -66,7 +60,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Roles.Commands
                 return OperacionResultadoDto.Fallo("No se pudo registrar el nuevo rol en el sistema.");
             }
 
-            // 🔹 La auditoría CREAR_ROL la genera automáticamente ApplicationDbContext
             return OperacionResultadoDto.Exito("Rol registrado exitosamente.");
         }
     }

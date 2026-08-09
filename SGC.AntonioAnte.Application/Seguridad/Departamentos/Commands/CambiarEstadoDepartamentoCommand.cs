@@ -9,10 +9,7 @@ using System.Threading.Tasks;
 namespace SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands
 {
     // 1. COMMAND
-    public class CambiarEstadoDepartamentoCommand : IRequest<OperacionResultadoDto>
-    {
-        public Guid Id { get; set; }
-    }
+    public record CambiarEstadoDepartamentoCommand(Guid Id) : IRequest<OperacionResultadoDto>;
 
     // 2. VALIDATOR (FluentValidation)
     public class CambiarEstadoDepartamentoCommandValidator : AbstractValidator<CambiarEstadoDepartamentoCommand>

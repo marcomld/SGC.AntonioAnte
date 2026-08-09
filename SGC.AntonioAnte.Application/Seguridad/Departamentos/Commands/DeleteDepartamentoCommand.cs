@@ -9,10 +9,7 @@ using System.Threading.Tasks;
 namespace SGC.AntonioAnte.Application.Seguridad.Departamentos.Commands
 {
     // 1. COMMAND
-    public class DeleteDepartamentoCommand : IRequest<OperacionResultadoDto>
-    {
-        public Guid Id { get; set; }
-    }
+    public record DeleteDepartamentoCommand(Guid Id) : IRequest<OperacionResultadoDto>;
 
     // 2. VALIDATOR (FluentValidation)
     public class DeleteDepartamentoCommandValidator : AbstractValidator<DeleteDepartamentoCommand>
