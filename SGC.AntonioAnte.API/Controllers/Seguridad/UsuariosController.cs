@@ -1,12 +1,12 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.AddClaim;
-using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.CreateUsuario;
+using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.CambiarEstadoUsuario;
+using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.UpdateUsuario;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Queries;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Usuarios;
-using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.UpdateUsuario;
-using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.CambiarEstadoUsuario;
 
 namespace SGC.AntonioAnte.API.Controllers.Seguridad
 {
@@ -38,19 +38,22 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPost]
         public async Task<IActionResult> Registrar([FromBody] CreateUsuarioDto dto)
         {
-            var command = new CreateUsuarioCommand
-            {
-                Identificacion = dto.Identificacion,
-                Nombres = dto.Nombres,
-                Apellidos = dto.Apellidos,
-                Email = dto.Email,
-                DepartamentoId = dto.DepartamentoId,
-                Password = dto.Password,
-                RolAsignado = dto.RolAsignado
-            };
+            var command = new CreateUsuarioCommand(
+                dto.Identificacion,
+                dto.Nombres,
+                dto.Apellidos,
+                dto.Email,
+                dto.DepartamentoId,
+                dto.Password,
+                dto.RolAsignado
+            );
 
-            var nuevoUsuarioId = await _mediator.Send(command);
-            return Ok(new { Id = nuevoUsuarioId, Mensaje = "Funcionario registrado exitosamente." });
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         [HttpPut("{id:guid}")]

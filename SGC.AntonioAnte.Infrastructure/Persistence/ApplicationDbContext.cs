@@ -79,7 +79,7 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
                         accion = $"CREAR_{nombreEntidad.ToUpper()}";
                         var camposCreados = entry.Properties
                             .Where(p => !propiedadesOmitidas.Contains(p.Metadata.Name) && p.CurrentValue != null)
-                            .Select(p => $"{p.Metadata.Name}: '{p.CurrentValue}'");
+                            .Select(p => FormatearCampoCreado(p, entry.Entity));
 
                         if (!camposCreados.Any()) continue;
 
@@ -102,7 +102,7 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
 
                                 if (valorAnterior.ToString() != valorNuevo.ToString())
                                 {
-                                    cambios.Add($"{propiedad.Metadata.Name}: '{valorAnterior}' -> '{valorNuevo}'");
+                                    cambios.Add(FormatearCampoModificado(propiedad, entry.Entity));
 
                                     // Detectamos si cambió 'EstadoActivo'
                                     if (propiedad.Metadata.Name.Equals("EstadoActivo", StringComparison.OrdinalIgnoreCase))
@@ -132,7 +132,8 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
                         accion = $"ELIMINAR_{nombreEntidad.ToUpper()}";
                         var valoresEliminados = entry.Properties
                             .Where(p => !propiedadesOmitidas.Contains(p.Metadata.Name) && p.OriginalValue != null)
-                            .Select(p => $"{p.Metadata.Name}: '{p.OriginalValue}'");
+                            .Select(p => FormatearCampoEliminado(p, entry.Entity));
+
                         datosAdicionales = $"Registro eliminado: {string.Join(" | ", valoresEliminados)}";
                         break;
                 }
@@ -156,6 +157,45 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
             }
 
             return await base.SaveChangesAsync(cancellationToken);
+        }
+
+        // =========================================================================
+        // MÉTODOS DE FORMATEO Y TRADUCCIÓN DE CLAVES FORÁNEAS A TEXTO COMPRENSIBLE
+        // =========================================================================
+        private static string FormatearCampoCreado(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry propiedad, object entidad)
+        {
+            if (propiedad.Metadata.Name.Equals("DepartamentoId", StringComparison.OrdinalIgnoreCase) && entidad is Usuario usuario)
+            {
+                string nombreDepartamento = usuario.Departamento?.Nombre ?? "Sin Departamento Asignado";
+                return $"Departamento: '{nombreDepartamento}'";
+            }
+
+            return $"{propiedad.Metadata.Name}: '{propiedad.CurrentValue}'";
+        }
+
+        private static string FormatearCampoModificado(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry propiedad, object entidad)
+        {
+            var valorAnterior = propiedad.OriginalValue ?? "null";
+            var valorNuevo = propiedad.CurrentValue ?? "null";
+
+            if (propiedad.Metadata.Name.Equals("DepartamentoId", StringComparison.OrdinalIgnoreCase) && entidad is Usuario usuario)
+            {
+                string nombreDepartamentoNuevo = usuario.Departamento?.Nombre ?? (valorNuevo.ToString() == "null" ? "Sin Departamento" : valorNuevo.ToString()!);
+                return $"Departamento: cambiado a '{nombreDepartamentoNuevo}'";
+            }
+
+            return $"{propiedad.Metadata.Name}: '{valorAnterior}' -> '{valorNuevo}'";
+        }
+
+        private static string FormatearCampoEliminado(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry propiedad, object entidad)
+        {
+            if (propiedad.Metadata.Name.Equals("DepartamentoId", StringComparison.OrdinalIgnoreCase) && entidad is Usuario usuario)
+            {
+                string nombreDepartamento = usuario.Departamento?.Nombre ?? "Sin Departamento";
+                return $"Departamento: '{nombreDepartamento}'";
+            }
+
+            return $"{propiedad.Metadata.Name}: '{propiedad.OriginalValue}'";
         }
 
         private static bool EsTablaInternaIdentity(object entity)

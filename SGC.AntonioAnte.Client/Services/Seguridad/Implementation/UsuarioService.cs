@@ -68,13 +68,12 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
 
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    resultado.Exitoso = true;
-                    resultado.Mensaje = "Funcionario registrado con éxito en la BD Municipal.";
-                    return resultado;
+                    var respuestaApi = await respuesta.Content.ReadFromJsonAsync<OperacionResultadoDto>(_jsonOptions);
+                    return respuestaApi ?? OperacionResultadoDto.Exito("Funcionario registrado con éxito en la BD Municipal.");
                 }
 
-                resultado.Exitoso = false;
                 var contenidoError = await respuesta.Content.ReadAsStringAsync();
+                resultado.Exitoso = false;
                 resultado.Mensaje = ExtraerMensajeErrorUniversal(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
