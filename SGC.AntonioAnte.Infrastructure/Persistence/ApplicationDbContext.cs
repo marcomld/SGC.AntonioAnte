@@ -162,40 +162,60 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
         // =========================================================================
         // MÉTODOS DE FORMATEO Y TRADUCCIÓN DE CLAVES FORÁNEAS A TEXTO COMPRENSIBLE
         // =========================================================================
-        private static string FormatearCampoCreado(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry propiedad, object entidad)
+        private string FormatearCampoCreado(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry propiedad, object entidad)
         {
-            if (propiedad.Metadata.Name.Equals("DepartamentoId", StringComparison.OrdinalIgnoreCase) && entidad is Usuario usuario)
+            if (propiedad.Metadata.Name.Equals("DepartamentoId", StringComparison.OrdinalIgnoreCase) && entidad is Usuario)
             {
-                string nombreDepartamento = usuario.Departamento?.Nombre ?? "Sin Departamento Asignado";
+                var idNuevo = propiedad.CurrentValue as Guid?;
+                string nombreDepartamento = ObtenerNombreDepartamento(idNuevo);
                 return $"Departamento: '{nombreDepartamento}'";
             }
 
             return $"{propiedad.Metadata.Name}: '{propiedad.CurrentValue}'";
         }
 
-        private static string FormatearCampoModificado(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry propiedad, object entidad)
+        private string FormatearCampoModificado(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry propiedad, object entidad)
         {
-            var valorAnterior = propiedad.OriginalValue ?? "null";
-            var valorNuevo = propiedad.CurrentValue ?? "null";
+            var valorAnterior = propiedad.OriginalValue;
+            var valorNuevo = propiedad.CurrentValue;
 
-            if (propiedad.Metadata.Name.Equals("DepartamentoId", StringComparison.OrdinalIgnoreCase) && entidad is Usuario usuario)
+            if (propiedad.Metadata.Name.Equals("DepartamentoId", StringComparison.OrdinalIgnoreCase) && entidad is Usuario)
             {
-                string nombreDepartamentoNuevo = usuario.Departamento?.Nombre ?? (valorNuevo.ToString() == "null" ? "Sin Departamento" : valorNuevo.ToString()!);
-                return $"Departamento: cambiado a '{nombreDepartamentoNuevo}'";
+                var idAnterior = valorAnterior as Guid?;
+                var idNuevo = valorNuevo as Guid?;
+
+                string nombreAnterior = ObtenerNombreDepartamento(idAnterior);
+                string nombreNuevo = ObtenerNombreDepartamento(idNuevo);
+
+                return $"Departamento: '{nombreAnterior}' -> '{nombreNuevo}'";
             }
 
-            return $"{propiedad.Metadata.Name}: '{valorAnterior}' -> '{valorNuevo}'";
+            return $"{propiedad.Metadata.Name}: '{valorAnterior ?? "null"}' -> '{valorNuevo ?? "null"}'";
         }
 
-        private static string FormatearCampoEliminado(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry propiedad, object entidad)
+        private string FormatearCampoEliminado(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry propiedad, object entidad)
         {
-            if (propiedad.Metadata.Name.Equals("DepartamentoId", StringComparison.OrdinalIgnoreCase) && entidad is Usuario usuario)
+            if (propiedad.Metadata.Name.Equals("DepartamentoId", StringComparison.OrdinalIgnoreCase) && entidad is Usuario)
             {
-                string nombreDepartamento = usuario.Departamento?.Nombre ?? "Sin Departamento";
+                var idAnterior = propiedad.OriginalValue as Guid?;
+                string nombreDepartamento = ObtenerNombreDepartamento(idAnterior);
                 return $"Departamento: '{nombreDepartamento}'";
             }
 
             return $"{propiedad.Metadata.Name}: '{propiedad.OriginalValue}'";
+        }
+
+        private string ObtenerNombreDepartamento(Guid? departamentoId)
+        {
+            if (!departamentoId.HasValue || departamentoId.Value == Guid.Empty)
+                return "Sin Departamento";
+
+            var depLocal = Departamentos.Local.FirstOrDefault(d => d.Id == departamentoId.Value);
+            if (depLocal != null)
+                return depLocal.Nombre;
+
+            var depDb = Departamentos.Find(departamentoId.Value);
+            return depDb?.Nombre ?? "Sin Departamento";
         }
 
         private static bool EsTablaInternaIdentity(object entity)

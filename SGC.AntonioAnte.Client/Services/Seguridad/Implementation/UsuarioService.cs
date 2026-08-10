@@ -120,13 +120,12 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
 
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    resultado.Exitoso = true;
-                    resultado.Mensaje = "Datos actualizados correctamente.";
-                    return resultado;
+                    var respuestaApi = await respuesta.Content.ReadFromJsonAsync<OperacionResultadoDto>(_jsonOptions);
+                    return respuestaApi ?? OperacionResultadoDto.Exito("Datos actualizados correctamente.");
                 }
 
-                resultado.Exitoso = false;
                 var contenidoError = await respuesta.Content.ReadAsStringAsync();
+                resultado.Exitoso = false;
                 resultado.Mensaje = ExtraerMensajeErrorUniversal(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)

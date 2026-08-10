@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.AddClaim;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.CambiarEstadoUsuario;
-using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.UpdateUsuario;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Queries;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Usuarios;
 
@@ -59,17 +58,20 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         [HttpPut("{id:guid}")]
         public async Task<IActionResult> Actualizar([FromRoute] Guid id, [FromBody] UpdateUsuarioDto dto)
         {
-            var command = new UpdateUsuarioCommand
-            {
-                Id = id,
-                Nombres = dto.Nombres,
-                Apellidos = dto.Apellidos,
-                Email = dto.Email,
-                DepartamentoId = dto.DepartamentoId
-            };
+            var command = new UpdateUsuarioCommand(
+                id,
+                dto.Nombres,
+                dto.Apellidos,
+                dto.Email,
+                dto.DepartamentoId
+            );
 
-            await _mediator.Send(command);
-            return Ok(new { Mensaje = "Datos del funcionario actualizados exitosamente." });
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         [HttpPut("{id:guid}/activar")]
