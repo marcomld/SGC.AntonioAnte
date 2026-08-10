@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using SGC.AntonioAnte.Application.Common.Interfaces;
+using SGC.AntonioAnte.Domain.Common.Attributes;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using System;
 using System.Collections.Generic;
@@ -160,62 +162,85 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
         }
 
         // =========================================================================
-        // MÉTODOS DE FORMATEO Y TRADUCCIÓN DE CLAVES FORÁNEAS A TEXTO COMPRENSIBLE
+        // TRADUCCIÓN 100% GENÉRICA MEDIANTE REFLECTION Y ATRIBUTOS
         // =========================================================================
-        private string FormatearCampoCreado(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry propiedad, object entidad)
+        private string FormatearCampoCreado(PropertyEntry propiedad, object entidad)
         {
-            if (propiedad.Metadata.Name.Equals("DepartamentoId", StringComparison.OrdinalIgnoreCase) && entidad is Usuario)
-            {
-                var idNuevo = propiedad.CurrentValue as Guid?;
-                string nombreDepartamento = ObtenerNombreDepartamento(idNuevo);
-                return $"Departamento: '{nombreDepartamento}'";
-            }
+            string valorLegible = ResolverValorLegible(propiedad, entidad, propiedad.CurrentValue);
+            string nombreCampo = ObtenerEtiquetaCampo(propiedad);
 
-            return $"{propiedad.Metadata.Name}: '{propiedad.CurrentValue}'";
+            return $"{nombreCampo}: '{valorLegible}'";
         }
 
-        private string FormatearCampoModificado(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry propiedad, object entidad)
+        private string FormatearCampoModificado(PropertyEntry propiedad, object entidad)
         {
-            var valorAnterior = propiedad.OriginalValue;
-            var valorNuevo = propiedad.CurrentValue;
+            string valorAnteriorLegible = ResolverValorLegible(propiedad, entidad, propiedad.OriginalValue);
+            string valorNuevoLegible = ResolverValorLegible(propiedad, entidad, propiedad.CurrentValue);
+            string nombreCampo = ObtenerEtiquetaCampo(propiedad);
 
-            if (propiedad.Metadata.Name.Equals("DepartamentoId", StringComparison.OrdinalIgnoreCase) && entidad is Usuario)
-            {
-                var idAnterior = valorAnterior as Guid?;
-                var idNuevo = valorNuevo as Guid?;
-
-                string nombreAnterior = ObtenerNombreDepartamento(idAnterior);
-                string nombreNuevo = ObtenerNombreDepartamento(idNuevo);
-
-                return $"Departamento: '{nombreAnterior}' -> '{nombreNuevo}'";
-            }
-
-            return $"{propiedad.Metadata.Name}: '{valorAnterior ?? "null"}' -> '{valorNuevo ?? "null"}'";
+            return $"{nombreCampo}: '{valorAnteriorLegible}' -> '{valorNuevoLegible}'";
         }
 
-        private string FormatearCampoEliminado(Microsoft.EntityFrameworkCore.ChangeTracking.PropertyEntry propiedad, object entidad)
+        private string FormatearCampoEliminado(PropertyEntry propiedad, object entidad)
         {
-            if (propiedad.Metadata.Name.Equals("DepartamentoId", StringComparison.OrdinalIgnoreCase) && entidad is Usuario)
-            {
-                var idAnterior = propiedad.OriginalValue as Guid?;
-                string nombreDepartamento = ObtenerNombreDepartamento(idAnterior);
-                return $"Departamento: '{nombreDepartamento}'";
-            }
+            string valorLegible = ResolverValorLegible(propiedad, entidad, propiedad.OriginalValue);
+            string nombreCampo = ObtenerEtiquetaCampo(propiedad);
 
-            return $"{propiedad.Metadata.Name}: '{propiedad.OriginalValue}'";
+            return $"{nombreCampo}: '{valorLegible}'";
         }
 
-        private string ObtenerNombreDepartamento(Guid? departamentoId)
+        /// <summary>
+        /// Método genérico que mediante Reflection busca si la propiedad tiene el atributo [AuditDisplayName].
+        /// Si lo tiene, extrae el texto legible de la entidad de navegación asociada.
+        /// </summary>
+        private string ResolverValorLegible(PropertyEntry propiedad, object entidad, object? valorRaw)
         {
-            if (!departamentoId.HasValue || departamentoId.Value == Guid.Empty)
-                return "Sin Departamento";
+            if (valorRaw == null || valorRaw.ToString() == "null") return "null";
 
-            var depLocal = Departamentos.Local.FirstOrDefault(d => d.Id == departamentoId.Value);
-            if (depLocal != null)
-                return depLocal.Nombre;
+            // 1. Buscar si la propiedad del objeto tiene el atributo [AuditDisplayName]
+            var propInfo = entidad.GetType().GetProperty(propiedad.Metadata.Name);
+            var auditAttr = propInfo?.GetCustomAttribute<AuditDisplayNameAttribute>();
 
-            var depDb = Departamentos.Find(departamentoId.Value);
-            return depDb?.Nombre ?? "Sin Departamento";
+            if (auditAttr != null)
+            {
+                // 2. Extraer la propiedad de navegación (ej. 'Departamento')
+                var navProp = entidad.GetType().GetProperty(auditAttr.NavigationPropertyName);
+                var objetoNavegacion = navProp?.GetValue(entidad);
+
+                if (objetoNavegacion != null)
+                {
+                    // Extraer la propiedad de texto (ej. 'Nombre')
+                    var displayProp = objetoNavegacion.GetType().GetProperty(auditAttr.DisplayPropertyName);
+                    var textoLegible = displayProp?.GetValue(objetoNavegacion)?.ToString();
+
+                    if (!string.IsNullOrWhiteSpace(textoLegible))
+                        return textoLegible;
+                }
+
+                // 3. Si la propiedad de navegación no estaba cargada en memoria, consultar usando Find(Type, Key)
+                var targetType = objetoNavegacion?.GetType() ?? navProp?.PropertyType;
+                if (targetType != null && valorRaw is Guid guidId && guidId != Guid.Empty)
+                {
+                    // 🔹 Solución CS0411: Usamos la sobrecarga no genérica DbContext.Find(Type, key)
+                    var objetoDb = Find(targetType, guidId);
+                    if (objetoDb != null)
+                    {
+                        var displayProp = objetoDb.GetType().GetProperty(auditAttr.DisplayPropertyName);
+                        return displayProp?.GetValue(objetoDb)?.ToString() ?? valorRaw.ToString()!;
+                    }
+                }
+            }
+
+            return valorRaw.ToString()!;
+        }
+
+        private static string ObtenerEtiquetaCampo(PropertyEntry propiedad)
+        {
+            if (propiedad.Metadata.Name.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && propiedad.Metadata.Name.Length > 2)
+            {
+                return propiedad.Metadata.Name.Substring(0, propiedad.Metadata.Name.Length - 2);
+            }
+            return propiedad.Metadata.Name;
         }
 
         private static bool EsTablaInternaIdentity(object entity)

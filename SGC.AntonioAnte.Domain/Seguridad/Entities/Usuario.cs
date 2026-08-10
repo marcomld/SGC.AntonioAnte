@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using SGC.AntonioAnte.Domain.Common.Attributes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,8 +15,11 @@ namespace SGC.AntonioAnte.Domain.Seguridad.Entities
         public string Apellidos { get; set; } = string.Empty;
 
         // 🔹 Nuevo: Llave foránea hacia Departamento (Nullable por si es SuperAdmin)
+        // 🔹 Decoramos con el Atributo indicando la propiedad de navegación ("Departamento")
+        // y el campo visible a extraer ("Nombre")
+        [AuditDisplayName(nameof(Departamento), nameof(Entities.Departamento.Nombre))]
         public Guid? DepartamentoId { get; set; }
-        public virtual Departamento? Departamento { get; set; } // Propiedad de Navegación
+        public virtual Departamento? Departamento { get; set; }
 
         public bool EstadoActivo { get; set; } = true;
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
