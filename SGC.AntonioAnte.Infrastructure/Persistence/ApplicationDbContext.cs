@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using SGC.AntonioAnte.Application.Common.Interfaces;
+using SGC.AntonioAnte.Domain.Common.Attributes;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using System;
 using System.Collections.Generic;
@@ -79,7 +81,7 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
                         accion = $"CREAR_{nombreEntidad.ToUpper()}";
                         var camposCreados = entry.Properties
                             .Where(p => !propiedadesOmitidas.Contains(p.Metadata.Name) && p.CurrentValue != null)
-                            .Select(p => $"{p.Metadata.Name}: '{p.CurrentValue}'");
+                            .Select(p => FormatearCampoCreado(p, entry.Entity));
 
                         if (!camposCreados.Any()) continue;
 
@@ -102,7 +104,7 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
 
                                 if (valorAnterior.ToString() != valorNuevo.ToString())
                                 {
-                                    cambios.Add($"{propiedad.Metadata.Name}: '{valorAnterior}' -> '{valorNuevo}'");
+                                    cambios.Add(FormatearCampoModificado(propiedad, entry.Entity));
 
                                     // Detectamos si cambió 'EstadoActivo'
                                     if (propiedad.Metadata.Name.Equals("EstadoActivo", StringComparison.OrdinalIgnoreCase))
@@ -132,7 +134,8 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
                         accion = $"ELIMINAR_{nombreEntidad.ToUpper()}";
                         var valoresEliminados = entry.Properties
                             .Where(p => !propiedadesOmitidas.Contains(p.Metadata.Name) && p.OriginalValue != null)
-                            .Select(p => $"{p.Metadata.Name}: '{p.OriginalValue}'");
+                            .Select(p => FormatearCampoEliminado(p, entry.Entity));
+
                         datosAdicionales = $"Registro eliminado: {string.Join(" | ", valoresEliminados)}";
                         break;
                 }
@@ -156,6 +159,88 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
             }
 
             return await base.SaveChangesAsync(cancellationToken);
+        }
+
+        // =========================================================================
+        // TRADUCCIÓN 100% GENÉRICA MEDIANTE REFLECTION Y ATRIBUTOS
+        // =========================================================================
+        private string FormatearCampoCreado(PropertyEntry propiedad, object entidad)
+        {
+            string valorLegible = ResolverValorLegible(propiedad, entidad, propiedad.CurrentValue);
+            string nombreCampo = ObtenerEtiquetaCampo(propiedad);
+
+            return $"{nombreCampo}: '{valorLegible}'";
+        }
+
+        private string FormatearCampoModificado(PropertyEntry propiedad, object entidad)
+        {
+            string valorAnteriorLegible = ResolverValorLegible(propiedad, entidad, propiedad.OriginalValue);
+            string valorNuevoLegible = ResolverValorLegible(propiedad, entidad, propiedad.CurrentValue);
+            string nombreCampo = ObtenerEtiquetaCampo(propiedad);
+
+            return $"{nombreCampo}: '{valorAnteriorLegible}' -> '{valorNuevoLegible}'";
+        }
+
+        private string FormatearCampoEliminado(PropertyEntry propiedad, object entidad)
+        {
+            string valorLegible = ResolverValorLegible(propiedad, entidad, propiedad.OriginalValue);
+            string nombreCampo = ObtenerEtiquetaCampo(propiedad);
+
+            return $"{nombreCampo}: '{valorLegible}'";
+        }
+
+        /// <summary>
+        /// Método genérico que mediante Reflection busca si la propiedad tiene el atributo [AuditDisplayName].
+        /// Si lo tiene, extrae el texto legible de la entidad de navegación asociada.
+        /// </summary>
+        private string ResolverValorLegible(PropertyEntry propiedad, object entidad, object? valorRaw)
+        {
+            if (valorRaw == null || valorRaw.ToString() == "null") return "null";
+
+            // 1. Buscar si la propiedad del objeto tiene el atributo [AuditDisplayName]
+            var propInfo = entidad.GetType().GetProperty(propiedad.Metadata.Name);
+            var auditAttr = propInfo?.GetCustomAttribute<AuditDisplayNameAttribute>();
+
+            if (auditAttr != null)
+            {
+                // 2. Extraer la propiedad de navegación (ej. 'Departamento')
+                var navProp = entidad.GetType().GetProperty(auditAttr.NavigationPropertyName);
+                var objetoNavegacion = navProp?.GetValue(entidad);
+
+                if (objetoNavegacion != null)
+                {
+                    // Extraer la propiedad de texto (ej. 'Nombre')
+                    var displayProp = objetoNavegacion.GetType().GetProperty(auditAttr.DisplayPropertyName);
+                    var textoLegible = displayProp?.GetValue(objetoNavegacion)?.ToString();
+
+                    if (!string.IsNullOrWhiteSpace(textoLegible))
+                        return textoLegible;
+                }
+
+                // 3. Si la propiedad de navegación no estaba cargada en memoria, consultar usando Find(Type, Key)
+                var targetType = objetoNavegacion?.GetType() ?? navProp?.PropertyType;
+                if (targetType != null && valorRaw is Guid guidId && guidId != Guid.Empty)
+                {
+                    // 🔹 Solución CS0411: Usamos la sobrecarga no genérica DbContext.Find(Type, key)
+                    var objetoDb = Find(targetType, guidId);
+                    if (objetoDb != null)
+                    {
+                        var displayProp = objetoDb.GetType().GetProperty(auditAttr.DisplayPropertyName);
+                        return displayProp?.GetValue(objetoDb)?.ToString() ?? valorRaw.ToString()!;
+                    }
+                }
+            }
+
+            return valorRaw.ToString()!;
+        }
+
+        private static string ObtenerEtiquetaCampo(PropertyEntry propiedad)
+        {
+            if (propiedad.Metadata.Name.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && propiedad.Metadata.Name.Length > 2)
+            {
+                return propiedad.Metadata.Name.Substring(0, propiedad.Metadata.Name.Length - 2);
+            }
+            return propiedad.Metadata.Name;
         }
 
         private static bool EsTablaInternaIdentity(object entity)

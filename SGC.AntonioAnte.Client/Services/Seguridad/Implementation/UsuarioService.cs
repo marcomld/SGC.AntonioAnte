@@ -19,22 +19,44 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
             _jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         }
 
-        public async Task<List<UsuarioResponseDto>?> ObtenerTodosLosUsuariosAsync()
+        public async Task<ResultadoPaginadoDto<UsuarioResponseDto>?> ObtenerUsuariosPaginadosAsync(
+            string? busqueda,
+            bool? estadoActivo,
+            Guid? departamentoId,
+            int pagina = 1,
+            int registrosPorPagina = 10)
         {
             try
             {
-                var respuesta = await _httpClient.GetAsync("api/v1/seguridad/usuarios");
+                var url = $"api/v1/seguridad/usuarios?pagina={pagina}&registrosPorPagina={registrosPorPagina}";
+
+                if (!string.IsNullOrWhiteSpace(busqueda))
+                    url += $"&busqueda={Uri.EscapeDataString(busqueda)}";
+
+                if (estadoActivo.HasValue)
+                    url += $"&estadoActivo={estadoActivo.Value}";
+
+                if (departamentoId.HasValue && departamentoId != Guid.Empty)
+                    url += $"&departamentoId={departamentoId.Value}";
+
+                var respuesta = await _httpClient.GetAsync(url);
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    var resultadoJson = await respuesta.Content.ReadFromJsonAsync<RespuestaApi<List<UsuarioResponseDto>>>(_jsonOptions);
-                    return resultadoJson?.Data;
+                    return await respuesta.Content.ReadFromJsonAsync<ResultadoPaginadoDto<UsuarioResponseDto>>(_jsonOptions);
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error al consultar nómina: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error al consultar nómina paginada: {ex.Message}");
             }
             return null;
+        }
+
+        // Método sin paginación para modales (compatibilidad)
+        public async Task<List<UsuarioResponseDto>?> ObtenerTodosLosUsuariosAsync()
+        {
+            var resPaginado = await ObtenerUsuariosPaginadosAsync(null, null, null, 1, 1000);
+            return resPaginado?.Datos;
         }
 
         public async Task<OperacionResultadoDto> RegistrarFuncionarioAsync(CreateUsuarioDto nuevoUsuario)
@@ -46,13 +68,12 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
 
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    resultado.Exitoso = true;
-                    resultado.Mensaje = "Funcionario registrado con éxito en la BD Municipal.";
-                    return resultado;
+                    var respuestaApi = await respuesta.Content.ReadFromJsonAsync<OperacionResultadoDto>(_jsonOptions);
+                    return respuestaApi ?? OperacionResultadoDto.Exito("Funcionario registrado con éxito en la BD Municipal.");
                 }
 
-                resultado.Exitoso = false;
                 var contenidoError = await respuesta.Content.ReadAsStringAsync();
+                resultado.Exitoso = false;
                 resultado.Mensaje = ExtraerMensajeErrorUniversal(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
@@ -64,28 +85,27 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
             return resultado;
         }
 
-        public async Task<OperacionResultadoDto> AsignarPermisosAsync(Guid id, AddClaimDto claimDto)
+        public async Task<OperacionResultadoDto> AsignarPermisoAsync(Guid id, UserPermissionDto permisoDto)
         {
             var resultado = new OperacionResultadoDto();
             try
             {
-                // Inyecta el GUID del usuario directamente en la URL REST
-                var respuesta = await _httpClient.PostAsJsonAsync($"api/v1/seguridad/usuarios/{id}/claims", claimDto);
+                var respuesta = await _httpClient.PostAsJsonAsync($"api/v1/seguridad/usuarios/{id}/permisos", permisoDto);
 
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    resultado.Exitoso = true;
-                    return resultado;
+                    var respuestaApi = await respuesta.Content.ReadFromJsonAsync<OperacionResultadoDto>(_jsonOptions);
+                    return respuestaApi ?? OperacionResultadoDto.Exito("Permiso asignado correctamente al funcionario.");
                 }
 
-                resultado.Exitoso = false;
                 var contenidoError = await respuesta.Content.ReadAsStringAsync();
+                resultado.Exitoso = false;
                 resultado.Mensaje = ExtraerMensajeErrorUniversal(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
             {
                 resultado.Exitoso = false;
-                resultado.Mensaje = $"Fallo de red al asignar permisos: {ex.Message}";
+                resultado.Mensaje = $"Fallo de red al asignar permiso: {ex.Message}";
             }
             return resultado;
         }
@@ -99,13 +119,12 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
 
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    resultado.Exitoso = true;
-                    resultado.Mensaje = "Datos actualizados correctamente.";
-                    return resultado;
+                    var respuestaApi = await respuesta.Content.ReadFromJsonAsync<OperacionResultadoDto>(_jsonOptions);
+                    return respuestaApi ?? OperacionResultadoDto.Exito("Datos actualizados correctamente.");
                 }
 
-                resultado.Exitoso = false;
                 var contenidoError = await respuesta.Content.ReadAsStringAsync();
+                resultado.Exitoso = false;
                 resultado.Mensaje = ExtraerMensajeErrorUniversal(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
@@ -116,36 +135,27 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
             return resultado;
         }
 
-        public async Task<OperacionResultadoDto> ActivarFuncionarioAsync(Guid id)
-        {
-            return await CambiarEstadoAsync($"api/v1/seguridad/usuarios/{id}/activar");
-        }
-
-        public async Task<OperacionResultadoDto> DesactivarFuncionarioAsync(Guid id)
-        {
-            return await CambiarEstadoAsync($"api/v1/seguridad/usuarios/{id}/desactivar");
-        }
-
-        private async Task<OperacionResultadoDto> CambiarEstadoAsync(string url)
+        public async Task<OperacionResultadoDto> CambiarEstadoFuncionarioAsync(Guid id)
         {
             var resultado = new OperacionResultadoDto();
             try
             {
-                var respuesta = await _httpClient.PutAsync(url, null);
+                var respuesta = await _httpClient.PutAsync($"api/v1/seguridad/usuarios/{id}/cambiar-estado", null);
+
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    resultado.Exitoso = true;
-                    return resultado;
+                    var respuestaApi = await respuesta.Content.ReadFromJsonAsync<OperacionResultadoDto>(_jsonOptions);
+                    return respuestaApi ?? OperacionResultadoDto.Exito("Estado del funcionario actualizado correctamente.");
                 }
 
-                resultado.Exitoso = false;
                 var contenidoError = await respuesta.Content.ReadAsStringAsync();
+                resultado.Exitoso = false;
                 resultado.Mensaje = ExtraerMensajeErrorUniversal(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
             {
                 resultado.Exitoso = false;
-                resultado.Mensaje = $"Fallo de red: {ex.Message}";
+                resultado.Mensaje = $"Error de red: {ex.Message}";
             }
             return resultado;
         }

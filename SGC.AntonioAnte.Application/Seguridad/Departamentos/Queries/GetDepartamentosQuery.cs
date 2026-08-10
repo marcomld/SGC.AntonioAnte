@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Application.Seguridad.Departamentos.Queries
 {
-    // 1. QUERY (record posicional)
+    // 1. QUERY
     public record GetDepartamentosQuery(
         string? Busqueda = null,
         bool? EstadoActivo = null,
@@ -33,7 +33,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Departamentos.Queries
         {
             var query = _context.Departamentos.AsNoTracking().AsQueryable();
 
-            // 🔍 Filtro de Búsqueda General (Nombre o Descripción)
             if (!string.IsNullOrWhiteSpace(request.Busqueda))
             {
                 var busquedaNorm = request.Busqueda.Trim().ToLower();
@@ -42,7 +41,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Departamentos.Queries
                     (d.Descripcion != null && d.Descripcion.ToLower().Contains(busquedaNorm)));
             }
 
-            // 🔍 Filtro por Estado (Activo / Inactivo)
             if (request.EstadoActivo.HasValue)
             {
                 query = query.Where(d => d.EstadoActivo == request.EstadoActivo.Value);
@@ -50,7 +48,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Departamentos.Queries
 
             var totalRegistros = await query.CountAsync(cancellationToken);
 
-            // 🚀 Paginación eficiente
             int pagina = request.Pagina < 1 ? 1 : request.Pagina;
             int registrosPorPagina = request.RegistrosPorPagina < 1 ? 10 : request.RegistrosPorPagina;
 
@@ -67,13 +64,11 @@ namespace SGC.AntonioAnte.Application.Seguridad.Departamentos.Queries
                 })
                 .ToListAsync(cancellationToken);
 
-            return new ResultadoPaginadoDto<DepartamentoDto>
-            {
-                Items = items,
-                TotalRegistros = totalRegistros,
-                PaginaActual = pagina,
-                RegistrosPorPagina = registrosPorPagina
-            };
+            return ResultadoPaginadoDto<DepartamentoDto>.Crear(
+                items,
+                totalRegistros,
+                pagina,
+                registrosPorPagina);
         }
     }
 }

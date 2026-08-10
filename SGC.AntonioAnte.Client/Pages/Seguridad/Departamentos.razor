@@ -60,7 +60,7 @@
 
                 <div class="col-12 col-md-2 d-flex align-items-end mt-auto pt-2 pt-md-0">
                     <button class="btn btn-light text-danger border w-100 py-2 fw-semibold" @onclick="LimpiarFiltros" title="Limpiar Filtros">
-                        <i class="bi bi-eraser-fill me-1"></i> Limpiar
+                        <i class="bi bi-eraser-fill me-1"></i>
                     </button>
                 </div>
             </div>
@@ -158,10 +158,10 @@
 
                     <nav>
                         <ul class="pagination pagination-sm mb-0">
-                            <li class="page-item @(paginaActual == 1 ? "disabled" : "")">
+                            <li class="page-item @(resultadoPaginado.TienePaginaAnterior ? "" : "disabled")">
                                 <button class="page-item-btn" @onclick="() => IrAPagina(1)" title="Primera página"><i class="bi bi-chevron-double-left"></i></button>
                             </li>
-                            <li class="page-item @(paginaActual == 1 ? "disabled" : "")">
+                            <li class="page-item @(resultadoPaginado.TienePaginaAnterior ? "" : "disabled")">
                                 <button class="page-item-btn" @onclick="() => IrAPagina(paginaActual - 1)" title="Anterior"><i class="bi bi-chevron-left"></i></button>
                             </li>
 
@@ -169,10 +169,10 @@
                                 <span class="page-item-text">Página @paginaActual de @resultadoPaginado.TotalPaginas</span>
                             </li>
 
-                            <li class="page-item @(paginaActual >= resultadoPaginado.TotalPaginas ? "disabled" : "")">
+                            <li class="page-item @(resultadoPaginado.TienePaginaSiguiente ? "" : "disabled")">
                                 <button class="page-item-btn" @onclick="() => IrAPagina(paginaActual + 1)" title="Siguiente"><i class="bi bi-chevron-right"></i></button>
                             </li>
-                            <li class="page-item @(paginaActual >= resultadoPaginado.TotalPaginas ? "disabled" : "")">
+                            <li class="page-item @(resultadoPaginado.TienePaginaSiguiente ? "" : "disabled")">
                                 <button class="page-item-btn" @onclick="() => IrAPagina(resultadoPaginado.TotalPaginas)" title="Última página"><i class="bi bi-chevron-double-right"></i></button>
                             </li>
                         </ul>
@@ -419,7 +419,6 @@
         cargando = false;
     }
 
-    // 🚀 Búsqueda en tiempo real con Debounce (~350ms)
     private void OnInputBusqueda(ChangeEventArgs e)
     {
         busquedaRapida = e.Value?.ToString() ?? string.Empty;
@@ -441,7 +440,6 @@
         debounceTimer.Start();
     }
 
-    // 🚀 Cambio de Filtro por Estado
     private async Task OnCambiarFiltroEstado(ChangeEventArgs e)
     {
         filtroEstadoStr = e.Value?.ToString() ?? string.Empty;

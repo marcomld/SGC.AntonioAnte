@@ -40,41 +40,35 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auditorias.Queries
                 .AsNoTracking()
                 .AsQueryable();
 
-            // Filtro Fecha Desde
             if (request.FechaDesde.HasValue)
             {
                 var desdeUtc = request.FechaDesde.Value.Date.ToUniversalTime();
                 query = query.Where(a => a.FechaCreacion >= desdeUtc);
             }
 
-            // Filtro Fecha Hasta
             if (request.FechaHasta.HasValue)
             {
                 var hastaUtc = request.FechaHasta.Value.Date.AddDays(1).AddTicks(-1).ToUniversalTime();
                 query = query.Where(a => a.FechaCreacion <= hastaUtc);
             }
 
-            // Filtro Usuario
             if (request.UsuarioId.HasValue)
             {
                 query = query.Where(a => a.UsuarioId == request.UsuarioId.Value);
             }
 
-            // Filtro Acción
             if (!string.IsNullOrWhiteSpace(request.Accion))
             {
                 var accionNorm = request.Accion.Trim().ToLower();
                 query = query.Where(a => a.Accion.ToLower().Contains(accionNorm));
             }
 
-            // Filtro Entidad
             if (!string.IsNullOrWhiteSpace(request.Entidad))
             {
                 var entidadNorm = request.Entidad.Trim().ToLower();
                 query = query.Where(a => a.Entidad.ToLower().Contains(entidadNorm));
             }
 
-            // Búsqueda General
             if (!string.IsNullOrWhiteSpace(request.Busqueda))
             {
                 var busquedaNorm = request.Busqueda.Trim().ToLower();
@@ -96,7 +90,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auditorias.Queries
 
             int pagina = request.Pagina < 1 ? 1 : request.Pagina;
             int registrosPorPagina = request.RegistrosPorPagina < 1 ? 15 : request.RegistrosPorPagina;
-            int totalPaginas = (int)Math.Ceiling((double)totalRegistros / registrosPorPagina);
 
             var items = await query
                 .OrderByDescending(a => a.FechaCreacion)
@@ -111,22 +104,19 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auditorias.Queries
                     EmailUsuario = a.Usuario != null ? (a.Usuario.Email ?? string.Empty) : string.Empty,
                     Accion = a.Accion ?? string.Empty,
                     Entidad = a.Entidad ?? string.Empty,
-                    EntidadId = a.EntidadId ?? string.Empty,             // 🔹 Soluciona el aviso CS8601
-                    DatosAdicionales = a.DatosAdicionales ?? string.Empty, // 🔹 Soluciona el aviso CS8601
-                    DireccionIp = a.DireccionIp ?? string.Empty,         // 🔹 Soluciona el aviso CS8601
-                    Navegador = a.Navegador ?? string.Empty,             // 🔹 Soluciona el aviso CS8601
+                    EntidadId = a.EntidadId ?? string.Empty,
+                    DatosAdicionales = a.DatosAdicionales ?? string.Empty,
+                    DireccionIp = a.DireccionIp ?? string.Empty,
+                    Navegador = a.Navegador ?? string.Empty,
                     FechaCreacion = a.FechaCreacion
                 })
                 .ToListAsync(cancellationToken);
 
-            return new ResultadoPaginadoDto<AuditLogResponseDto>
-            {
-                Items = items,
-                TotalRegistros = totalRegistros,
-                PaginaActual = pagina,
-                RegistrosPorPagina = registrosPorPagina,
-                TotalPaginas = totalPaginas
-            };
+            return ResultadoPaginadoDto<AuditLogResponseDto>.Crear(
+                items,
+                totalRegistros,
+                pagina,
+                registrosPorPagina);
         }
     }
 }
