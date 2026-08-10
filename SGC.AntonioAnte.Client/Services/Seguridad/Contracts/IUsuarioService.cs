@@ -14,7 +14,7 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Contracts
 
         Task<List<UsuarioResponseDto>?> ObtenerTodosLosUsuariosAsync();
         Task<OperacionResultadoDto> RegistrarFuncionarioAsync(CreateUsuarioDto nuevoUsuario);
-        Task<OperacionResultadoDto> AsignarPermisosAsync(Guid id, AddClaimDto claimDto);
+        Task<OperacionResultadoDto> AsignarPermisoAsync(Guid id, UserPermissionDto permisoDto);
         Task<OperacionResultadoDto> ActualizarFuncionarioAsync(Guid id, UpdateUsuarioDto usuarioDto);
         Task<OperacionResultadoDto> CambiarEstadoFuncionarioAsync(Guid id);
     }

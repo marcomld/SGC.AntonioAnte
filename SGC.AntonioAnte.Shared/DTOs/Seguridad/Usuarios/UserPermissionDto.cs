@@ -9,7 +9,7 @@ namespace SGC.AntonioAnte.Shared.DTOs.Seguridad.Usuarios
 {
     public class UserPermissionDto
     {
-        public Guid UsuarioId { get; set; }
-        public List<PermissionDto> PermisosDirectos { get; set; } = new();
+        public string TipoClaim { get; set; } = string.Empty;
+        public string ValorClaim { get; set; } = string.Empty;
     }
 }

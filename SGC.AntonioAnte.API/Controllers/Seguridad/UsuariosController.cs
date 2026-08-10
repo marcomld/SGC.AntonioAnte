@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands;
-using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.AddClaim;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Queries;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Usuarios;
 
@@ -85,19 +84,16 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
             return Ok(resultado);
         }
 
-        // CIBERSEGURIDAD: Uso exclusivo de GUID en lugar de Cédula (Prevención IDOR / OWASP A01:2021)
-        [HttpPost("{id:guid}/claims")]
-        public async Task<IActionResult> AsignarClaim([FromRoute] Guid id, [FromBody] AddClaimDto claimDto)
+        [HttpPost("{id:guid}/permisos")]
+        public async Task<IActionResult> AsignarPermiso([FromRoute] Guid id, [FromBody] UserPermissionDto dto)
         {
-            var command = new AddClaimCommand
-            {
-                UsuarioId = id,
-                ClaimType = claimDto.TipoClaim,
-                ClaimValue = claimDto.ValorClaim
-            };
+            var command = new AsignarPermisoUsuarioCommand(id, dto.TipoClaim, dto.ValorClaim);
+            var resultado = await _mediator.Send(command);
 
-            await _mediator.Send(command);
-            return Ok(new { Mensaje = "Privilegio catastral inyectado y auditado con éxito para el funcionario." });
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
     }
 }

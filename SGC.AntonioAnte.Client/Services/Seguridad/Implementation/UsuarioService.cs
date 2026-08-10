@@ -85,28 +85,27 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
             return resultado;
         }
 
-        public async Task<OperacionResultadoDto> AsignarPermisosAsync(Guid id, AddClaimDto claimDto)
+        public async Task<OperacionResultadoDto> AsignarPermisoAsync(Guid id, UserPermissionDto permisoDto)
         {
             var resultado = new OperacionResultadoDto();
             try
             {
-                // Inyecta el GUID del usuario directamente en la URL REST
-                var respuesta = await _httpClient.PostAsJsonAsync($"api/v1/seguridad/usuarios/{id}/claims", claimDto);
+                var respuesta = await _httpClient.PostAsJsonAsync($"api/v1/seguridad/usuarios/{id}/permisos", permisoDto);
 
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    resultado.Exitoso = true;
-                    return resultado;
+                    var respuestaApi = await respuesta.Content.ReadFromJsonAsync<OperacionResultadoDto>(_jsonOptions);
+                    return respuestaApi ?? OperacionResultadoDto.Exito("Permiso asignado correctamente al funcionario.");
                 }
 
-                resultado.Exitoso = false;
                 var contenidoError = await respuesta.Content.ReadAsStringAsync();
+                resultado.Exitoso = false;
                 resultado.Mensaje = ExtraerMensajeErrorUniversal(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
             {
                 resultado.Exitoso = false;
-                resultado.Mensaje = $"Fallo de red al asignar permisos: {ex.Message}";
+                resultado.Mensaje = $"Fallo de red al asignar permiso: {ex.Message}";
             }
             return resultado;
         }
