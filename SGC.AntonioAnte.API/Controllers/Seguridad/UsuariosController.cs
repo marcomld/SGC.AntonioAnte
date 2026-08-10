@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.AddClaim;
-using SGC.AntonioAnte.Application.Seguridad.Usuarios.Commands.CambiarEstadoUsuario;
 using SGC.AntonioAnte.Application.Seguridad.Usuarios.Queries;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Usuarios;
 
@@ -74,20 +73,16 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
             return Ok(resultado);
         }
 
-        [HttpPut("{id:guid}/activar")]
-        public async Task<IActionResult> Activar([FromRoute] Guid id)
+        [HttpPut("{id:guid}/cambiar-estado")]
+        public async Task<IActionResult> CambiarEstado([FromRoute] Guid id)
         {
-            var command = new CambiarEstadoUsuarioCommand { Id = id, EstadoActivo = true };
-            await _mediator.Send(command);
-            return Ok(new { Mensaje = "Funcionario activado exitosamente." });
-        }
+            var command = new CambiarEstadoUsuarioCommand(id);
+            var resultado = await _mediator.Send(command);
 
-        [HttpPut("{id:guid}/desactivar")]
-        public async Task<IActionResult> Desactivar([FromRoute] Guid id)
-        {
-            var command = new CambiarEstadoUsuarioCommand { Id = id, EstadoActivo = false };
-            await _mediator.Send(command);
-            return Ok(new { Mensaje = "Funcionario desactivado exitosamente (Soft Delete)." });
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         // CIBERSEGURIDAD: Uso exclusivo de GUID en lugar de Cédula (Prevención IDOR / OWASP A01:2021)

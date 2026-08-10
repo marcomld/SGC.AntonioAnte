@@ -914,17 +914,14 @@
         if (usuarioAEstadoCambiar == null) return;
 
         var user = usuarioAEstadoCambiar;
-        bool nuevoEstado = !user.EstadoActivo;
         usuarioAEstadoCambiar = null;
 
-        var resultado = nuevoEstado
-            ? await UsuarioService.ActivarFuncionarioAsync(user.Id)
-            : await UsuarioService.DesactivarFuncionarioAsync(user.Id);
+        var resultado = await UsuarioService.CambiarEstadoFuncionarioAsync(user.Id);
 
         if (resultado.Exitoso)
         {
             await CargarNominaUsuariosPaginada();
-            await MostrarToast($"Acceso de {user.Nombres} {user.Apellidos} {(nuevoEstado ? "restaurado" : "desactivado")} exitosamente.", true);
+            await MostrarToast(resultado.Mensaje ?? "Estado actualizado exitosamente.", true);
         }
         else
         {

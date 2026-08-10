@@ -136,36 +136,27 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
             return resultado;
         }
 
-        public async Task<OperacionResultadoDto> ActivarFuncionarioAsync(Guid id)
-        {
-            return await CambiarEstadoAsync($"api/v1/seguridad/usuarios/{id}/activar");
-        }
-
-        public async Task<OperacionResultadoDto> DesactivarFuncionarioAsync(Guid id)
-        {
-            return await CambiarEstadoAsync($"api/v1/seguridad/usuarios/{id}/desactivar");
-        }
-
-        private async Task<OperacionResultadoDto> CambiarEstadoAsync(string url)
+        public async Task<OperacionResultadoDto> CambiarEstadoFuncionarioAsync(Guid id)
         {
             var resultado = new OperacionResultadoDto();
             try
             {
-                var respuesta = await _httpClient.PutAsync(url, null);
+                var respuesta = await _httpClient.PutAsync($"api/v1/seguridad/usuarios/{id}/cambiar-estado", null);
+
                 if (respuesta.IsSuccessStatusCode)
                 {
-                    resultado.Exitoso = true;
-                    return resultado;
+                    var respuestaApi = await respuesta.Content.ReadFromJsonAsync<OperacionResultadoDto>(_jsonOptions);
+                    return respuestaApi ?? OperacionResultadoDto.Exito("Estado del funcionario actualizado correctamente.");
                 }
 
-                resultado.Exitoso = false;
                 var contenidoError = await respuesta.Content.ReadAsStringAsync();
+                resultado.Exitoso = false;
                 resultado.Mensaje = ExtraerMensajeErrorUniversal(contenidoError, respuesta.StatusCode);
             }
             catch (Exception ex)
             {
                 resultado.Exitoso = false;
-                resultado.Mensaje = $"Fallo de red: {ex.Message}";
+                resultado.Mensaje = $"Error de red: {ex.Message}";
             }
             return resultado;
         }
