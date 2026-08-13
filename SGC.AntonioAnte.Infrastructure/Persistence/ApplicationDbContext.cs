@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using SGC.AntonioAnte.Application.Common.Interfaces;
+using SGC.AntonioAnte.Domain.Catastro.Entities;
 using SGC.AntonioAnte.Domain.Common.Attributes;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using System;
@@ -25,8 +26,18 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
             _currentUserService = currentUserService;
         }
 
-        public DbSet<Auditoria> Auditorias { get; set; }
-        public DbSet<Departamento> Departamentos { get; set; }
+        // Módulo 1: Seguridad
+        public DbSet<Auditoria> Auditorias => Set<Auditoria>();
+        public DbSet<Departamento> Departamentos => Set<Departamento>();
+
+        // Módulo 2: Catastro
+        public DbSet<TipoTenencia> TiposTenencia => Set<TipoTenencia>();
+        public DbSet<TipoEstructura> TiposEstructura => Set<TipoEstructura>();
+        public DbSet<EstadoConservacion> EstadosConservacion => Set<EstadoConservacion>();
+        public DbSet<Propietario> Propietarios => Set<Propietario>();
+        public DbSet<Predio> Predios => Set<Predio>();
+        public DbSet<Dominio> Dominios => Set<Dominio>();
+        public DbSet<BloqueConstruccion> BloquesConstruccion => Set<BloqueConstruccion>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
