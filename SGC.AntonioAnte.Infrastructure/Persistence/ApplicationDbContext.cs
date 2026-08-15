@@ -2,6 +2,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using SGC.AntonioAnte.Application.Common.Interfaces;
+using SGC.AntonioAnte.Domain.Catastro.Entities;
+using SGC.AntonioAnte.Domain.Common;
 using SGC.AntonioAnte.Domain.Common.Attributes;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using System;
@@ -25,8 +27,18 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
             _currentUserService = currentUserService;
         }
 
-        public DbSet<Auditoria> Auditorias { get; set; }
-        public DbSet<Departamento> Departamentos { get; set; }
+        // Módulo 1: Seguridad
+        public DbSet<Auditoria> Auditorias => Set<Auditoria>();
+        public DbSet<Departamento> Departamentos => Set<Departamento>();
+
+        // Módulo 2: Catastro
+        public DbSet<TipoTenencia> TiposTenencia => Set<TipoTenencia>();
+        public DbSet<TipoEstructura> TiposEstructura => Set<TipoEstructura>();
+        public DbSet<EstadoConservacion> EstadosConservacion => Set<EstadoConservacion>();
+        public DbSet<Propietario> Propietarios => Set<Propietario>();
+        public DbSet<Predio> Predios => Set<Predio>();
+        public DbSet<Dominio> Dominios => Set<Dominio>();
+        public DbSet<BloqueConstruccion> BloquesConstruccion => Set<BloqueConstruccion>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -35,10 +47,34 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
         }
 
         // =========================================================================
-        // INTERCEPTOR DE AUDITORÍA AUTOMÁTICA (DELTA AUDIT)
+        // INTERCEPTOR DE AUDITORÍA AUTOMÁTICA Y METADATOS DE ENTIDAD
         // =========================================================================
         public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
+            var fechaActual = DateTime.UtcNow;
+            var usuarioActual = _currentUserService.UsuarioId
+                                ?? _currentUserService.UsuarioIdGuid?.ToString()
+                                ?? "Sistema";
+
+            // 🟢 1. ASIGNACIÓN AUTOMÁTICA DE METADATOS (AuditableEntity)
+            foreach (var entry in ChangeTracker.Entries<AuditableEntity>())
+            {
+                switch (entry.State)
+                {
+                    case EntityState.Added:
+                        entry.Entity.FechaCreacion = fechaActual;
+                        entry.Entity.CreadoPor = usuarioActual;
+                        entry.Entity.EstadoActivo = true;
+                        break;
+
+                    case EntityState.Modified:
+                        entry.Entity.FechaModificacion = fechaActual;
+                        entry.Entity.ModificadoPor = usuarioActual;
+                        break;
+                }
+            }
+
+            // 🔵 2. INTERCEPTOR DE DELTA TRACKING (Seguridad.Auditorias)
             var entradasRastreadas = ChangeTracker.Entries()
                 .Where(e => (e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted)
                             && e.Entity is not Auditoria
@@ -76,7 +112,6 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
 
                 switch (entry.State)
                 {
-                    // 🟢 1. CREADO / INSERT
                     case EntityState.Added:
                         accion = $"CREAR_{nombreEntidad.ToUpper()}";
                         var camposCreados = entry.Properties
@@ -88,7 +123,6 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
                         datosAdicionales = $"Registro creado: {string.Join(" | ", camposCreados)}";
                         break;
 
-                    // 🔵 2. ACTUALIZADO / UPDATE / CAMBIO DE ESTADO
                     case EntityState.Modified:
                         accion = $"ACTUALIZAR_{nombreEntidad.ToUpper()}";
                         var cambios = new List<string>();
@@ -106,7 +140,6 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
                                 {
                                     cambios.Add(FormatearCampoModificado(propiedad, entry.Entity));
 
-                                    // Detectamos si cambió 'EstadoActivo'
                                     if (propiedad.Metadata.Name.Equals("EstadoActivo", StringComparison.OrdinalIgnoreCase))
                                     {
                                         esCambioEstadoExclusivo = true;
@@ -118,7 +151,6 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
 
                         if (!cambios.Any()) continue;
 
-                        // 🎯 Si solo cambió el EstadoActivo, etiquetamos la acción como ACTIVAR o DESACTIVAR
                         if (cambios.Count == 1 && esCambioEstadoExclusivo)
                         {
                             accion = nuevoEstadoActivo
@@ -129,7 +161,6 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
                         datosAdicionales = $"Cambios aplicados: {string.Join(" | ", cambios)}";
                         break;
 
-                    // 🔴 3. ELIMINADO / DELETE
                     case EntityState.Deleted:
                         accion = $"ELIMINAR_{nombreEntidad.ToUpper()}";
                         var valoresEliminados = entry.Properties
@@ -149,7 +180,7 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
                     DatosAdicionales = datosAdicionales,
                     DireccionIp = _currentUserService.IpAddress,
                     Navegador = _currentUserService.UserAgent,
-                    FechaCreacion = DateTime.UtcNow
+                    FechaCreacion = fechaActual
                 });
             }
 
@@ -162,13 +193,12 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
         }
 
         // =========================================================================
-        // TRADUCCIÓN 100% GENÉRICA MEDIANTE REFLECTION Y ATRIBUTOS
+        // TRADUCCIÓN MEDIANTE REFLECTION Y ATRIBUTO [AuditDisplayName]
         // =========================================================================
         private string FormatearCampoCreado(PropertyEntry propiedad, object entidad)
         {
             string valorLegible = ResolverValorLegible(propiedad, entidad, propiedad.CurrentValue);
             string nombreCampo = ObtenerEtiquetaCampo(propiedad);
-
             return $"{nombreCampo}: '{valorLegible}'";
         }
 
@@ -177,7 +207,6 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
             string valorAnteriorLegible = ResolverValorLegible(propiedad, entidad, propiedad.OriginalValue);
             string valorNuevoLegible = ResolverValorLegible(propiedad, entidad, propiedad.CurrentValue);
             string nombreCampo = ObtenerEtiquetaCampo(propiedad);
-
             return $"{nombreCampo}: '{valorAnteriorLegible}' -> '{valorNuevoLegible}'";
         }
 
@@ -185,31 +214,23 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
         {
             string valorLegible = ResolverValorLegible(propiedad, entidad, propiedad.OriginalValue);
             string nombreCampo = ObtenerEtiquetaCampo(propiedad);
-
             return $"{nombreCampo}: '{valorLegible}'";
         }
 
-        /// <summary>
-        /// Método genérico que mediante Reflection busca si la propiedad tiene el atributo [AuditDisplayName].
-        /// Si lo tiene, extrae el texto legible de la entidad de navegación asociada.
-        /// </summary>
         private string ResolverValorLegible(PropertyEntry propiedad, object entidad, object? valorRaw)
         {
             if (valorRaw == null || valorRaw.ToString() == "null") return "null";
 
-            // 1. Buscar si la propiedad del objeto tiene el atributo [AuditDisplayName]
             var propInfo = entidad.GetType().GetProperty(propiedad.Metadata.Name);
             var auditAttr = propInfo?.GetCustomAttribute<AuditDisplayNameAttribute>();
 
             if (auditAttr != null)
             {
-                // 2. Extraer la propiedad de navegación (ej. 'Departamento')
                 var navProp = entidad.GetType().GetProperty(auditAttr.NavigationPropertyName);
                 var objetoNavegacion = navProp?.GetValue(entidad);
 
                 if (objetoNavegacion != null)
                 {
-                    // Extraer la propiedad de texto (ej. 'Nombre')
                     var displayProp = objetoNavegacion.GetType().GetProperty(auditAttr.DisplayPropertyName);
                     var textoLegible = displayProp?.GetValue(objetoNavegacion)?.ToString();
 
@@ -217,11 +238,9 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
                         return textoLegible;
                 }
 
-                // 3. Si la propiedad de navegación no estaba cargada en memoria, consultar usando Find(Type, Key)
                 var targetType = objetoNavegacion?.GetType() ?? navProp?.PropertyType;
                 if (targetType != null && valorRaw is Guid guidId && guidId != Guid.Empty)
                 {
-                    // 🔹 Solución CS0411: Usamos la sobrecarga no genérica DbContext.Find(Type, key)
                     var objetoDb = Find(targetType, guidId);
                     if (objetoDb != null)
                     {
