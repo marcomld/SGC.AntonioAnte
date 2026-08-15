@@ -10,6 +10,7 @@ namespace SGC.AntonioAnte.Domain.Catastro.Entities
 {
     public class Dominio : AuditableEntity
     {
+        [AuditDisplayName(nameof(Predio), nameof(Entities.Predio.ClaveCatastral))]
         public Guid PredioId { get; private set; }
         public virtual Predio Predio { get; private set; } = null!;
 
