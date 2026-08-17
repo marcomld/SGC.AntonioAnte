@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SGC.AntonioAnte.Application.Catastro.Predios.Commands;
 using SGC.AntonioAnte.Application.Catastro.Predios.Queries;
+using SGC.AntonioAnte.Domain.Catastro.Enums;
 using SGC.AntonioAnte.Shared.DTOs.Catastro.Predios;
 
 namespace SGC.AntonioAnte.API.Controllers.Catastro
@@ -20,10 +21,16 @@ namespace SGC.AntonioAnte.API.Controllers.Catastro
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetPredios([FromQuery] string? busqueda)
+        public async Task<IActionResult> GetPredios(
+            [FromQuery] string? busqueda,
+            [FromQuery] bool? estadoActivo,
+            [FromQuery] TipoPredio? tipoPredio,
+            [FromQuery] int pagina = 1,
+            [FromQuery] int registrosPorPagina = 10)
         {
-            var resultado = await _mediator.Send(new GetPrediosQuery(busqueda));
-            return Ok(new { data = resultado, mensaje = "Listado de predios recuperado exitosamente." });
+            var query = new GetPrediosQuery(busqueda, estadoActivo, tipoPredio, pagina, registrosPorPagina);
+            var resultado = await _mediator.Send(query);
+            return Ok(resultado);
         }
 
         [HttpGet("{id:guid}")]
@@ -52,8 +59,12 @@ namespace SGC.AntonioAnte.API.Controllers.Catastro
                 dto.PoligonoWkt
             );
 
-            var id = await _mediator.Send(command);
-            return Ok(new { id, mensaje = "Predio (terreno base) registrado exitosamente en el catastro municipal." });
+            var resultado = await _mediator.Send(command);
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
 
         [HttpPost("{id:guid}/dominios")]
@@ -87,6 +98,17 @@ namespace SGC.AntonioAnte.API.Controllers.Catastro
 
             var bloqueId = await _mediator.Send(command);
             return Ok(new { id = bloqueId, mensaje = "Bloque de construcción registrado exitosamente en el predio." });
+        }
+
+        [HttpPut("{id:guid}/cambiar-estado")]
+        public async Task<IActionResult> CambiarEstado([FromRoute] Guid id)
+        {
+            var resultado = await _mediator.Send(new CambiarEstadoPredioCommand(id));
+
+            if (!resultado.Exitoso)
+                return BadRequest(new { mensaje = resultado.Mensaje });
+
+            return Ok(resultado);
         }
     }
 }

@@ -7,6 +7,7 @@ using SGC.AntonioAnte.Application.Common.Interfaces;
 using SGC.AntonioAnte.Domain.Catastro.Entities;
 using SGC.AntonioAnte.Domain.Catastro.Enums;
 using SGC.AntonioAnte.Domain.Catastro.ValueObjects;
+using SGC.AntonioAnte.Shared.DTOs.Common;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,7 +24,7 @@ namespace SGC.AntonioAnte.Application.Catastro.Predios.Commands
         decimal AreaTerrenoGrafica,
         string Direccion,
         string? PoligonoWkt
-    ) : IRequest<Guid>;
+    ) : IRequest<OperacionResultadoDto>;
 
     public class CreatePredioCommandValidator : AbstractValidator<CreatePredioCommand>
     {
@@ -41,7 +42,7 @@ namespace SGC.AntonioAnte.Application.Catastro.Predios.Commands
         }
     }
 
-    public class CreatePredioCommandHandler : IRequestHandler<CreatePredioCommand, Guid>
+    public class CreatePredioCommandHandler : IRequestHandler<CreatePredioCommand, OperacionResultadoDto>
     {
         private readonly IApplicationDbContext _context;
 
@@ -50,50 +51,58 @@ namespace SGC.AntonioAnte.Application.Catastro.Predios.Commands
             _context = context;
         }
 
-        public async Task<Guid> Handle(CreatePredioCommand request, CancellationToken cancellationToken)
+        public async Task<OperacionResultadoDto> Handle(CreatePredioCommand request, CancellationToken cancellationToken)
         {
-            // Instanciación y validación DPA del Value Object
-            var claveVO = ClaveCatastral.Crear(request.ClaveCatastral);
-
-            // CORRECCIÓN: Comparamos directamente contra el Value Object
-            var existe = await _context.Predios
-                .AnyAsync(p => p.ClaveCatastral == claveVO && p.EstadoActivo, cancellationToken);
-
-            if (existe)
+            try
             {
-                throw new Exception($"Ya existe un predio activo registrado con la clave catastral '{claveVO.Valor}'.");
-            }
+                var claveVO = ClaveCatastral.Crear(request.ClaveCatastral);
 
-            // Conversión de formato WKT a Geometría espacial de NetTopologySuite
-            Geometry? poligonoGeometry = null;
-            if (!string.IsNullOrWhiteSpace(request.PoligonoWkt))
+                var existe = await _context.Predios
+                    .AnyAsync(p => p.ClaveCatastral == claveVO && p.EstadoActivo, cancellationToken);
+
+                if (existe)
+                {
+                    return OperacionResultadoDto.Fallo($"Ya existe un predio activo registrado con la clave catastral '{claveVO.Valor}'.");
+                }
+
+                Geometry? poligonoGeometry = null;
+                if (!string.IsNullOrWhiteSpace(request.PoligonoWkt))
+                {
+                    try
+                    {
+                        var reader = new WKTReader();
+                        poligonoGeometry = reader.Read(request.PoligonoWkt);
+                        poligonoGeometry.SRID = 4326;
+                    }
+                    catch (Exception ex)
+                    {
+                        return OperacionResultadoDto.Fallo($"El formato espacial WKT ingresado no es válido: {ex.Message}");
+                    }
+                }
+
+                var nuevoPredio = Predio.Crear(
+                    claveVO,
+                    request.ClaveAnterior?.Trim(),
+                    request.TipoPredio,
+                    request.AreaTerrenoEscritura,
+                    request.AreaTerrenoGrafica,
+                    request.Direccion.Trim(),
+                    poligonoGeometry
+                );
+
+                _context.Predios.Add(nuevoPredio);
+                await _context.SaveChangesAsync(cancellationToken);
+
+                return OperacionResultadoDto.Exito("Predio base registrado exitosamente.");
+            }
+            catch (ArgumentException ex)
             {
-                try
-                {
-                    var reader = new WKTReader();
-                    poligonoGeometry = reader.Read(request.PoligonoWkt);
-                    poligonoGeometry.SRID = 4326; // WGS84
-                }
-                catch (Exception ex)
-                {
-                    throw new Exception($"El formato espacial WKT ingresado no es válido: {ex.Message}");
-                }
+                return OperacionResultadoDto.Fallo(ex.Message);
             }
-
-            var nuevoPredio = Predio.Crear(
-                claveVO,
-                request.ClaveAnterior,
-                request.TipoPredio,
-                request.AreaTerrenoEscritura,
-                request.AreaTerrenoGrafica,
-                request.Direccion,
-                poligonoGeometry
-            );
-
-            _context.Predios.Add(nuevoPredio);
-            await _context.SaveChangesAsync(cancellationToken);
-
-            return nuevoPredio.Id;
+            catch (Exception ex)
+            {
+                return OperacionResultadoDto.Fallo($"Error al procesar la solicitud: {ex.Message}");
+            }
         }
     }
 }
