@@ -1,6 +1,6 @@
 ﻿using SGC.AntonioAnte.Shared.DTOs.Catastro.Catalogos;
 
-namespace SGC.AntonioAnte.Client.Services.Catastro.Contracs
+namespace SGC.AntonioAnte.Client.Services.Catastro.Contracts
 {
     public interface ICatalogoService
     {

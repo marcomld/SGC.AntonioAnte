@@ -1,4 +1,4 @@
-﻿using SGC.AntonioAnte.Client.Services.Catastro.Contracs;
+﻿using SGC.AntonioAnte.Client.Services.Catastro.Contracts;
 using SGC.AntonioAnte.Shared.DTOs.Catastro.Predios;
 using SGC.AntonioAnte.Shared.DTOs.Common;
 using System.Net.Http.Json;

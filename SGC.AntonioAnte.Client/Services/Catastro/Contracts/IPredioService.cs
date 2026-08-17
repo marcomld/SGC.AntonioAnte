@@ -1,7 +1,7 @@
 ﻿using SGC.AntonioAnte.Shared.DTOs.Catastro.Predios;
 using SGC.AntonioAnte.Shared.DTOs.Common;
 
-namespace SGC.AntonioAnte.Client.Services.Catastro.Contracs
+namespace SGC.AntonioAnte.Client.Services.Catastro.Contracts
 {
     public interface IPredioService
     {

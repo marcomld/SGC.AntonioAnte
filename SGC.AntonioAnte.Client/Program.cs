@@ -5,7 +5,7 @@ using SGC.AntonioAnte.Client;
 using SGC.AntonioAnte.Client.Infrastructure.Http;
 using SGC.AntonioAnte.Client.Infrastructure.Security;
 using SGC.AntonioAnte.Client.Services;
-using SGC.AntonioAnte.Client.Services.Catastro.Contracs;
+using SGC.AntonioAnte.Client.Services.Catastro.Contracts;
 using SGC.AntonioAnte.Client.Services.Catastro.Implementation;
 using SGC.AntonioAnte.Client.Services.Contracts;
 using SGC.AntonioAnte.Client.Services.Seguridad.Contracts;
