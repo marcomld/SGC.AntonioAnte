@@ -44,5 +44,15 @@ namespace SGC.AntonioAnte.Domain.Catastro.Entities
                 AnioConstruccion = anioConstruccion
             };
         }
+
+        public void Actualizar(int numeroBloque, Guid tipoEstructuraId, Guid estadoConservacionId, int numeroPisos, decimal areaConstruccion, int anioConstruccion)
+        {
+            NumeroBloque = numeroBloque;
+            TipoEstructuraId = tipoEstructuraId;
+            EstadoConservacionId = estadoConservacionId;
+            NumeroPisos = numeroPisos;
+            AreaConstruccion = areaConstruccion;
+            AnioConstruccion = anioConstruccion;
+        }
     }
 }

@@ -2,8 +2,13 @@
 using SGC.AntonioAnte.Domain.Catastro.Enums;
 using SGC.AntonioAnte.Shared.DTOs.Catastro.Predios;
 using SGC.AntonioAnte.Shared.DTOs.Common;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Client.Services.Catastro.Implementation
 {
@@ -44,7 +49,7 @@ namespace SGC.AntonioAnte.Client.Services.Catastro.Implementation
                 {
                     var content = await response.Content.ReadAsStringAsync();
                     using var doc = JsonDocument.Parse(content);
-                    if (doc.RootElement.TryGetProperty("data", out var dataElem))
+                    if (doc.RootElement.TryGetProperty("data", out var dataElem) || doc.RootElement.TryGetProperty("Data", out dataElem))
                     {
                         return JsonSerializer.Deserialize<PredioDto>(dataElem.GetRawText(), _jsonOptions);
                     }
@@ -58,19 +63,20 @@ namespace SGC.AntonioAnte.Client.Services.Catastro.Implementation
             }
         }
 
-        public async Task<OperacionResultadoDto> CrearPredioBaseAsync(CreatePredioDto dto)
+        public async Task<OperacionResultadoDto> GuardarFichaCompletaAsync(CreateFichaCatastralDto dto)
         {
             try
             {
                 var response = await _httpClient.PostAsJsonAsync("api/v1/catastro/predios", dto);
+                var rawContent = await response.Content.ReadAsStringAsync();
+
                 if (response.IsSuccessStatusCode)
                 {
-                    var res = await response.Content.ReadFromJsonAsync<OperacionResultadoDto>(_jsonOptions);
-                    return res ?? OperacionResultadoDto.Exito("Predio registrado exitosamente.");
+                    var res = JsonSerializer.Deserialize<OperacionResultadoDto>(rawContent, _jsonOptions);
+                    return res ?? OperacionResultadoDto.Exito("Ficha catastral registrada exitosamente.");
                 }
 
-                var errorContent = await response.Content.ReadAsStringAsync();
-                return OperacionResultadoDto.Fallo(ExtraerMensajeError(errorContent, response.StatusCode));
+                return OperacionResultadoDto.Fallo(ExtraerMensajeError(rawContent, response.StatusCode));
             }
             catch (Exception ex)
             {
@@ -78,37 +84,21 @@ namespace SGC.AntonioAnte.Client.Services.Catastro.Implementation
             }
         }
 
-        public async Task<OperacionResultadoDto> AgregarDominiosAsync(Guid predioId, List<AddDominioDto> dominios)
+        // 🔥 NUEVA IMPLEMENTACIÓN 🔥
+        public async Task<OperacionResultadoDto> ActualizarFichaCompletaAsync(Guid id, UpdateFichaCatastralDto dto)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync($"api/v1/catastro/predios/{predioId}/dominios", dominios);
+                var response = await _httpClient.PutAsJsonAsync($"api/v1/catastro/predios/{id}", dto);
+                var rawContent = await response.Content.ReadAsStringAsync();
+
                 if (response.IsSuccessStatusCode)
                 {
-                    return OperacionResultadoDto.Exito("Dominios asignados correctamente.");
+                    var res = JsonSerializer.Deserialize<OperacionResultadoDto>(rawContent, _jsonOptions);
+                    return res ?? OperacionResultadoDto.Exito("Ficha catastral actualizada exitosamente.");
                 }
 
-                var errorContent = await response.Content.ReadAsStringAsync();
-                return OperacionResultadoDto.Fallo(ExtraerMensajeError(errorContent, response.StatusCode));
-            }
-            catch (Exception ex)
-            {
-                return OperacionResultadoDto.Fallo($"Error de comunicación: {ex.Message}");
-            }
-        }
-
-        public async Task<OperacionResultadoDto> AgregarBloquesAsync(Guid predioId, List<AddBloqueDto> bloques)
-        {
-            try
-            {
-                var response = await _httpClient.PostAsJsonAsync($"api/v1/catastro/predios/{predioId}/bloques", bloques);
-                if (response.IsSuccessStatusCode)
-                {
-                    return OperacionResultadoDto.Exito("Bloques constructivos registrados correctamente.");
-                }
-
-                var errorContent = await response.Content.ReadAsStringAsync();
-                return OperacionResultadoDto.Fallo(ExtraerMensajeError(errorContent, response.StatusCode));
+                return OperacionResultadoDto.Fallo(ExtraerMensajeError(rawContent, response.StatusCode));
             }
             catch (Exception ex)
             {

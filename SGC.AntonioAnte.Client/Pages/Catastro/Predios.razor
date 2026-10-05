@@ -1,13 +1,14 @@
 ﻿@page "/catastro/predios"
-@using System.Threading
-@using Microsoft.AspNetCore.Authorization
 @using SGC.AntonioAnte.Client.Services.Catastro.Contracts
 @using SGC.AntonioAnte.Domain.Catastro.Enums
 @using SGC.AntonioAnte.Shared.DTOs.Catastro.Catalogos
 @using SGC.AntonioAnte.Shared.DTOs.Catastro.Predios
+@using SGC.AntonioAnte.Shared.DTOs.Catastro.Propietarios
 @using SGC.AntonioAnte.Shared.DTOs.Common
+@using System.Threading
 
 @inject IPredioService PredioService
+@inject IPropietarioService PropietarioService
 @inject ICatalogoService CatalogoService
 
 <div class="container-fluid py-4 animate-fade-in">
@@ -179,6 +180,14 @@
                                         <button class="btn btn-sm btn-outline-primary rounded-2 btn-action" title="Ver Ficha Catastral" @onclick="() => VerDetallePredio(p)">
                                             <i class="bi bi-eye"></i>
                                         </button>
+
+                                        @if (p.EstadoActivo)
+                                        {
+                                            <button class="btn btn-sm btn-outline-warning rounded-2 btn-action" title="Editar Ficha Catastral" @onclick="() => EditarPredio(p)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                        }
+
                                         @if (p.EstadoActivo)
                                         {
                                             <button class="btn btn-sm btn-outline-danger rounded-2 btn-action" title="Desactivar Predio" @onclick="() => SolicitarCambioEstado(p)">
@@ -200,7 +209,6 @@
             </table>
         </div>
 
-        <!-- PIE DE TABLA CON PAGINACIÓN SERVER-SIDE -->
         @if (resultadoPaginado != null && resultadoPaginado.TotalRegistros > 0)
         {
             <div class="card-footer bg-white border-top py-3 px-4 d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
@@ -256,9 +264,11 @@
                     <div>
                         <h5 class="modal-title fw-bold text-dark">
                             <i class="bi bi-journal-text me-2 text-primary"></i>
-                            @(esModoVisualizacion ? "Ficha Catastral Multifinalitaria" : "Registro de Nueva Ficha Catastral")
+                            @(esModoVisualizacion ? "Ficha Catastral Multifinalitaria" : (esModoEdicion ? "Edición de Ficha Catastral" : "Registro de Nueva Ficha Catastral"))
                         </h5>
-                        <p class="text-muted small mb-0">Estructura según la Norma Técnica Nacional de Catastros (MIDUVI).</p>
+                        <p class="text-muted small mb-0">
+                            @(esModoEdicion ? "Actualización de información del inventario predial." : "Estructura según la Norma Técnica Nacional de Catastros (MIDUVI).")
+                        </p>
                     </div>
                     <button type="button" class="btn-close" @onclick="CerrarModalFicha" disabled="@procesandoModalFicha"></button>
                 </div>
@@ -268,17 +278,24 @@
                     <ul class="nav nav-pills nav-fill gap-2 p-1 bg-light rounded-3 border" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link @(tabActivo == 1 ? "active fw-bold shadow-sm" : "text-secondary")" @onclick="() => tabActivo = 1" type="button">
-                                <i class="bi bi-geo-alt me-1"></i> 1. Datos del Terreno
+                                <i class="bi @(EsTerrenoValido ? "bi-check-circle-fill text-success" : "bi-geo-alt") me-1"></i> 1. Datos del Terreno
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link @(tabActivo == 2 ? "active fw-bold shadow-sm" : "text-secondary")" @onclick="() => tabActivo = 2" type="button">
-                                <i class="bi bi-people me-1"></i> 2. Dominios y Propietarios
+                                <i class="bi @(EsDominioValido ? "bi-check-circle-fill text-success" : "bi-people") me-1"></i> 2. Dominios y Propietarios
+                                <span class="badge @(TotalPorcentajeDominios == 100.00m ? "bg-success" : (TotalPorcentajeDominios > 100.00m ? "bg-danger" : "bg-warning text-dark")) ms-1 font-monospace">
+                                    @TotalPorcentajeDominios.ToString("0.##")%
+                                </span>
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link @(tabActivo == 3 ? "active fw-bold shadow-sm" : "text-secondary")" @onclick="() => tabActivo = 3" type="button">
                                 <i class="bi bi-houses me-1"></i> 3. Edificaciones (Bloques)
+                                @if (listaBloquesMemoria.Any())
+                                {
+                                    <span class="badge bg-primary ms-1 font-monospace">@listaBloquesMemoria.Count</span>
+                                }
                             </button>
                         </li>
                     </ul>
@@ -297,11 +314,11 @@
 
                         <!-- TAB 1: DATOS DEL TERRENO -->
                         <div class="@(tabActivo == 1 ? "" : "d-none")">
-                            <!-- SELECTOR DE CLASIFICACIÓN DE SUELO (URBANO / RURAL) -->
                             <div class="row g-3 mb-3">
                                 <div class="col-md-4">
                                     <div class="form-floating">
-                                        <InputSelect id="ddlTipoPredioCrear" class="form-select" @bind-Value="modeloCreacion.TipoPredio" @bind-Value:after="OnTipoPredioCambiado" disabled="@(procesandoModalFicha || esModoVisualizacion)">
+                                        <!-- SE BLOQUEA EN MODO EDICIÓN -->
+                                        <InputSelect id="ddlTipoPredioCrear" class="form-select" @bind-Value="modeloCreacion.TipoPredio" @bind-Value:after="OnTipoPredioCambiado" disabled="@(procesandoModalFicha || esModoVisualizacion || esModoEdicion)">
                                             <option value="@TipoPredio.Urbano">Urbano</option>
                                             <option value="@TipoPredio.Rural">Rural</option>
                                         </InputSelect>
@@ -317,55 +334,59 @@
                                 </div>
                             </div>
 
-                            <!-- WIDGET DE CLAVE CATASTRAL SEGMENTADA (DPA MIDUVI) -->
                             <div class="card border border-primary-subtle bg-light-subtle rounded-4 p-3 mb-3 shadow-sm">
                                 <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-2 gap-2">
                                     <div class="fw-bold text-dark small">
                                         <i class="bi bi-upc-scan me-1 text-primary"></i>
                                         @(modeloCreacion.TipoPredio == TipoPredio.Urbano ? "Estructura Clave Urbana DPA (24 Dígitos)" : "Estructura Clave Rural DPA (19 Dígitos)")
+                                        @if (esModoEdicion)
+                                        {
+                                            <span class="text-danger ms-2" style="font-size:0.65rem;">(Bloqueado por Seguridad Catastral)</span>
+                                        }
                                     </div>
                                     <span class="badge @(modeloCreacion.ClaveCatastral.Length == TotalDigitosEsperados ? "bg-primary" : "bg-warning text-dark") font-monospace">
                                         Clave: @(string.IsNullOrWhiteSpace(modeloCreacion.ClaveCatastral) ? "Sin definir" : modeloCreacion.ClaveCatastral) (@modeloCreacion.ClaveCatastral.Length/@TotalDigitosEsperados)
                                     </span>
                                 </div>
 
+                                <!-- TODOS LOS INPUTS DPA SE BLOQUEAN EN MODO EDICIÓN -->
                                 <div class="row g-2">
                                     <div class="col-6 col-sm-4 col-md-3 col-lg">
                                         <label class="form-label text-muted dpa-label mb-1">Provincia (2)</label>
                                         <input type="text" class="form-control form-control-sm text-center font-monospace fw-bold" maxlength="2"
-                                               value="@ccProvincia" @oninput="(e) => OnSegmentoInput(e, 1)" disabled="@(procesandoModalFicha || esModoVisualizacion)" placeholder="10" />
+                                               value="@ccProvincia" @oninput="(e) => OnSegmentoInput(e, 1)" disabled="@(procesandoModalFicha || esModoVisualizacion || esModoEdicion)" />
                                     </div>
                                     <div class="col-6 col-sm-4 col-md-3 col-lg">
                                         <label class="form-label text-muted dpa-label mb-1">Cantón (2)</label>
                                         <input type="text" class="form-control form-control-sm text-center font-monospace fw-bold" maxlength="2"
-                                               value="@ccCanton" @oninput="(e) => OnSegmentoInput(e, 2)" disabled="@(procesandoModalFicha || esModoVisualizacion)" placeholder="02" />
+                                               value="@ccCanton" @oninput="(e) => OnSegmentoInput(e, 2)" disabled="@(procesandoModalFicha || esModoVisualizacion || esModoEdicion)" />
                                     </div>
                                     <div class="col-6 col-sm-4 col-md-3 col-lg">
                                         <label class="form-label text-muted dpa-label mb-1">Parroquia (2)</label>
                                         <input type="text" class="form-control form-control-sm text-center font-monospace fw-bold" maxlength="2"
-                                               value="@ccParroquia" @oninput="(e) => OnSegmentoInput(e, 3)" disabled="@(procesandoModalFicha || esModoVisualizacion)" placeholder="50" />
+                                               value="@ccParroquia" @oninput="(e) => OnSegmentoInput(e, 3)" disabled="@(procesandoModalFicha || esModoVisualizacion || esModoEdicion)" />
                                     </div>
                                     <div class="col-6 col-sm-4 col-md-3 col-lg">
                                         <label class="form-label text-muted dpa-label mb-1">Zona (2)</label>
                                         <input type="text" class="form-control form-control-sm text-center font-monospace fw-bold" maxlength="2"
-                                               value="@ccZona" @oninput="(e) => OnSegmentoInput(e, 4)" disabled="@(procesandoModalFicha || esModoVisualizacion)" placeholder="01" />
+                                               value="@ccZona" @oninput="(e) => OnSegmentoInput(e, 4)" disabled="@(procesandoModalFicha || esModoVisualizacion || esModoEdicion)" />
                                     </div>
                                     <div class="col-6 col-sm-4 col-md-3 col-lg">
                                         <label class="form-label text-muted dpa-label mb-1">Sector (2)</label>
                                         <input type="text" class="form-control form-control-sm text-center font-monospace fw-bold" maxlength="2"
-                                               value="@ccSector" @oninput="(e) => OnSegmentoInput(e, 5)" disabled="@(procesandoModalFicha || esModoVisualizacion)" placeholder="01" />
+                                               value="@ccSector" @oninput="(e) => OnSegmentoInput(e, 5)" disabled="@(procesandoModalFicha || esModoVisualizacion || esModoEdicion)" />
                                     </div>
                                     <div class="col-6 col-sm-4 col-md-3 col-lg">
                                         <label class="form-label text-muted dpa-label mb-1">
                                             @(modeloCreacion.TipoPredio == TipoPredio.Urbano ? "Manzana (3)" : "Polígono (3)")
                                         </label>
                                         <input type="text" class="form-control form-control-sm text-center font-monospace fw-bold" maxlength="3"
-                                               value="@ccManzanaPoligono" @oninput="(e) => OnSegmentoInput(e, 6)" disabled="@(procesandoModalFicha || esModoVisualizacion)" placeholder="001" />
+                                               value="@ccManzanaPoligono" @oninput="(e) => OnSegmentoInput(e, 6)" disabled="@(procesandoModalFicha || esModoVisualizacion || esModoEdicion)" />
                                     </div>
                                     <div class="col-6 col-sm-4 col-md-3 col-lg">
                                         <label class="form-label text-muted dpa-label mb-1">Predio (3)</label>
                                         <input type="text" class="form-control form-control-sm text-center font-monospace fw-bold" maxlength="3"
-                                               value="@ccPredio" @oninput="(e) => OnSegmentoInput(e, 7)" disabled="@(procesandoModalFicha || esModoVisualizacion)" placeholder="001" />
+                                               value="@ccPredio" @oninput="(e) => OnSegmentoInput(e, 7)" disabled="@(procesandoModalFicha || esModoVisualizacion || esModoEdicion)" />
                                     </div>
 
                                     @if (modeloCreacion.TipoPredio == TipoPredio.Urbano)
@@ -373,25 +394,25 @@
                                         <div class="col-6 col-sm-4 col-md-3 col-lg">
                                             <label class="form-label text-muted dpa-label mb-1">Bloque (3)</label>
                                             <input type="text" class="form-control form-control-sm text-center font-monospace fw-bold" maxlength="3"
-                                                   value="@ccBloque" @oninput="(e) => OnSegmentoInput(e, 8)" disabled="@(procesandoModalFicha || esModoVisualizacion)" placeholder="000" />
+                                                   value="@ccBloque" @oninput="(e) => OnSegmentoInput(e, 8)" disabled="@(procesandoModalFicha || esModoVisualizacion || esModoEdicion)" />
                                         </div>
                                         <div class="col-6 col-sm-4 col-md-3 col-lg">
                                             <label class="form-label text-muted dpa-label mb-1">Piso (2)</label>
                                             <input type="text" class="form-control form-control-sm text-center font-monospace fw-bold" maxlength="2"
-                                                   value="@ccPiso" @oninput="(e) => OnSegmentoInput(e, 9)" disabled="@(procesandoModalFicha || esModoVisualizacion)" placeholder="00" />
+                                                   value="@ccPiso" @oninput="(e) => OnSegmentoInput(e, 9)" disabled="@(procesandoModalFicha || esModoVisualizacion || esModoEdicion)" />
                                         </div>
                                     }
 
                                     <div class="col-6 col-sm-4 col-md-3 col-lg">
                                         <label class="form-label text-muted dpa-label mb-1">Unidad (3)</label>
                                         <input type="text" class="form-control form-control-sm text-center font-monospace fw-bold" maxlength="3"
-                                               value="@ccUnidad" @oninput="(e) => OnSegmentoInput(e, 10)" disabled="@(procesandoModalFicha || esModoVisualizacion)" placeholder="000" />
+                                               value="@ccUnidad" @oninput="(e) => OnSegmentoInput(e, 10)" disabled="@(procesandoModalFicha || esModoVisualizacion || esModoEdicion)" />
                                     </div>
                                 </div>
                                 <ValidationMessage For="@(() => modeloCreacion.ClaveCatastral)" class="text-danger small mt-2" />
                             </div>
 
-                            <!-- ÁREAS Y UBICACIÓN -->
+                            <!-- ÁREAS Y UBICACIÓN SI SE PUEDEN EDITAR -->
                             <div class="row g-3 mb-3">
                                 <div class="col-md-6">
                                     <div class="form-floating">
@@ -426,45 +447,368 @@
                             </div>
                         </div>
 
-                        <!-- TAB 2: DOMINIOS (Preparado para Paso 4) -->
+                        <!-- TAB 2: DOMINIOS Y PROPIETARIOS -->
                         <div class="@(tabActivo == 2 ? "" : "d-none")">
-                            <div class="alert alert-info border-0 rounded-3 d-flex align-items-center py-3">
-                                <i class="bi bi-info-circle-fill fs-4 me-3"></i>
-                                <div>
-                                    <div class="fw-bold">Gestión de Sujetos y Alícuotas de Dominio</div>
-                                    <div class="small">La vinculación de copropietarios con validación en tiempo real del 100.00% se habilitará en el Paso 4.</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- TAB 3: BLOQUES CONSTRUCTIVOS (Preparado para Paso 4) -->
-                        <div class="@(tabActivo == 3 ? "" : "d-none")">
-                            <div class="alert alert-info border-0 rounded-3 d-flex align-items-center py-3">
-                                <i class="bi bi-info-circle-fill fs-4 me-3"></i>
-                                <div>
-                                    <div class="fw-bold">Caracterización Física de Edificaciones</div>
-                                    <div class="small">Los bloques constructivos con catálogos dinámicos se habilitarán en el Paso 4.</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
-                            <button type="button" class="btn btn-light fw-semibold text-muted px-4" @onclick="CerrarModalFicha" disabled="@procesandoModalFicha">
-                                @(esModoVisualizacion ? "Cerrar" : "Cancelar")
-                            </button>
                             @if (!esModoVisualizacion)
                             {
-                                <button type="submit" class="btn btn-primary fw-semibold shadow-sm px-4" disabled="@procesandoModalFicha">
-                                    @if (procesandoModalFicha)
+                                <div class="card border @(dominioEnEdicion != null ? "border-warning bg-warning-subtle" : "bg-light-subtle") rounded-4 p-3 mb-4 shadow-sm">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div class="fw-bold text-dark small">
+                                            <i class="bi @(dominioEnEdicion != null ? "bi-pencil-square text-warning" : "bi-person-plus-fill text-primary") me-1"></i>
+                                            @(dominioEnEdicion != null ? "Editando Sujeto de Derecho" : "Vincular Sujeto de Derecho al Predio")
+                                        </div>
+                                        @if (dominioEnEdicion != null)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0" @onclick="CancelarEdicionDominio">Cancelar Edición</button>
+                                        }
+                                    </div>
+
+                                    <div class="row g-2 align-items-center mb-3">
+                                        <div class="col-md-5">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                                                <input type="text" class="form-control font-monospace" placeholder="Cédula / RUC del propietario..."
+                                                       @bind="cedulaBusquedaDominio" @onkeyup="OnCedulaBusquedaKeyUp" disabled="@(dominioEnEdicion != null)" />
+                                                <button class="btn btn-outline-primary" type="button" @onclick="BuscarPropietarioPorCedula" disabled="@(buscandoPropietario || dominioEnEdicion != null)">
+                                                    @if (buscandoPropietario)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm"></span>
+                                                    }
+                                                    else
+                                                    {
+
+                                                        <span>Buscar</span>
+                                                    }
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-7">
+                                            @if (propietarioEncontrado != null)
+                                            {
+                                                <div class="p-2 bg-white rounded border d-flex align-items-center justify-content-between">
+                                                    <div>
+                                                        <span class="badge bg-primary-subtle text-primary border me-2 font-monospace">@propietarioEncontrado.Identificacion</span>
+                                                        <strong class="text-dark small">@propietarioEncontrado.NombreCompleto</strong>
+                                                    </div>
+                                                    @if (dominioEnEdicion == null)
+                                                    {
+                                                        <button type="button" class="btn-close btn-sm" @onclick="() => propietarioEncontrado = null"></button>
+                                                    }
+                                                </div>
+                                            }
+                                            else if (!string.IsNullOrEmpty(mensajeBusquedaPropietario))
+                                            {
+                                                <span class="text-danger small"><i class="bi bi-exclamation-circle me-1"></i>@mensajeBusquedaPropietario</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">Ingrese la cédula o RUC para localizar al ciudadano.</span>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    @if (propietarioEncontrado != null)
                                     {
-                                        <span class="spinner-border spinner-border-sm me-1"></span> <span>Guardando...</span>
+                                        <div class="row g-2 align-items-end pt-2 border-top">
+                                            <div class="col-md-4">
+                                                <label class="form-label text-muted dpa-label mb-1">Tipo de Tenencia <span class="text-danger">*</span></label>
+                                                <select class="form-select form-select-sm" @bind="nuevoDominioTipoTenenciaId">
+                                                    <option value="">-- Seleccionar --</option>
+                                                    @foreach (var tenencia in tiposTenencia)
+                                                    {
+                                                        <option value="@tenencia.Id">@tenencia.Nombre</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label text-muted dpa-label mb-1">% Propiedad <span class="text-danger">*</span></label>
+                                                <input type="number" step="0.01" class="form-control form-control-sm text-end font-monospace" placeholder="100.00"
+                                                       @bind="nuevoDominioPorcentaje" />
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label text-muted dpa-label mb-1">Notaría / Título</label>
+                                                <input type="text" class="form-control form-control-sm" placeholder="Ej: Notaría Primera"
+                                                       @bind="nuevoDominioNotaria" />
+                                            </div>
+                                            <div class="col-md-3 d-flex justify-content-end">
+                                                <button type="button" class="btn btn-sm @(dominioEnEdicion != null ? "btn-warning text-dark" : "btn-primary") w-100 fw-semibold" @onclick="GuardarDominioEnLista">
+                                                    <i class="bi @(dominioEnEdicion != null ? "bi-check2-circle" : "bi-plus-lg") me-1"></i>
+                                                    @(dominioEnEdicion != null ? "Actualizar Dominio" : "Asignar Dominio")
+                                                </button>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-bold text-dark mb-0">
+                                    <i class="bi bi-shield-check text-primary me-2"></i>Propietarios y Derechos Registrados
+                                </h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="small text-muted fw-semibold">Alícuota Total Asignada:</span>
+                                    @if (TotalPorcentajeDominios == 100.00m)
+                                    {
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1.5 font-monospace fw-bold">
+                                            <i class="bi bi-check-circle-fill me-1"></i> 100.00% (Completo)
+                                        </span>
+                                    }
+                                    else if (TotalPorcentajeDominios > 100.00m)
+                                    {
+                                        <span class="badge bg-danger text-white rounded-pill px-3 py-1.5 font-monospace fw-bold shadow-sm">
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i> @TotalPorcentajeDominios.ToString("0.00")% (Excede el 100%)
+                                        </span>
                                     }
                                     else
                                     {
-                                        <i class="bi bi-save me-1"></i> <span>Guardar Ficha Base</span>
+                                        <span class="badge bg-warning-subtle text-dark border border-warning-subtle rounded-pill px-3 py-1.5 font-monospace fw-bold">
+                                            <i class="bi bi-pie-chart-fill me-1"></i> @TotalPorcentajeDominios.ToString("0.00")% (Faltan @((100.00m - TotalPorcentajeDominios).ToString("0.00"))%)
+                                        </span>
                                     }
-                                </button>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive rounded-3 border">
+                                <table class="table table-hover align-middle mb-0 custom-table">
+                                    <thead class="table-light text-uppercase font-monospace text-muted small" style="font-size: 0.75rem;">
+                                        <tr>
+                                            <th class="ps-3 py-2">Identificación</th>
+                                            <th class="py-2">Propietario / Razón Social</th>
+                                            <th class="py-2">Tipo Tenencia</th>
+                                            <th class="py-2 text-end">% Propiedad</th>
+                                            <th class="py-2">Notaría</th>
+                                            @if (!esModoVisualizacion)
+                                            {
+                                                <th class="text-end pe-3 py-2">Acciones</th>
+                                            }
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!listaDominiosMemoria.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="6" class="text-center py-4 text-muted small">
+                                                    <i class="bi bi-people display-6 d-block mb-1 opacity-50"></i>
+                                                    No se han asignado propietarios a esta ficha predial.
+                                                </td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var d in listaDominiosMemoria)
+                                            {
+                                                <!-- Resalta la fila si está en edición -->
+                                                <tr class="@(dominioEnEdicion == d ? "table-warning" : "")">
+                                                    <td class="ps-3 font-monospace fw-bold text-secondary">
+                                                        @d.Identificacion
+                                                        @if (esModoEdicion && d.Id == null)
+                                                        {
+                                                            <span class="badge bg-success ms-1" style="font-size: 0.6rem;">NUEVO</span>
+                                                        }
+                                                    </td>
+                                                    <td class="fw-semibold text-dark">@d.NombrePropietario</td>
+                                                    <td><span class="badge badge-dep text-dark">@d.NombreTipoTenencia</span></td>
+                                                    <td class="text-end font-monospace fw-bold text-primary">@d.PorcentajePropiedad.ToString("0.00")%</td>
+                                                    <td class="small text-muted">@(string.IsNullOrWhiteSpace(d.Notaria) ? "N/A" : d.Notaria)</td>
+                                                    @if (!esModoVisualizacion)
+                                                    {
+                                                        <td class="text-end pe-3">
+                                                            <div class="d-inline-flex gap-1">
+                                                                <button type="button" class="btn btn-sm btn-outline-primary rounded-2 py-0 px-2" title="Editar Dominio" @onclick="() => CargarDominioParaEdicion(d)">
+                                                                    <i class="bi bi-pencil"></i>
+                                                                </button>
+                                                                <button type="button" class="btn btn-sm btn-outline-danger rounded-2 py-0 px-2" title="Quitar Dominio" @onclick="() => EliminarDominioDeLista(d)">
+                                                                    <i class="bi bi-x-lg"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    }
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- TAB 3: EDIFICACIONES Y BLOQUES CONSTRUCTIVOS -->
+                        <div class="@(tabActivo == 3 ? "" : "d-none")">
+                            @if (!esModoVisualizacion)
+                            {
+                                <div class="card border @(bloqueEnEdicion != null ? "border-warning bg-warning-subtle" : "bg-light-subtle") rounded-4 p-3 mb-4 shadow-sm">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div class="fw-bold text-dark small">
+                                            <i class="bi @(bloqueEnEdicion != null ? "bi-pencil-square text-warning" : "bi-plus-square-fill text-primary") me-1"></i>
+                                            @(bloqueEnEdicion != null ? $"Editando Bloque Constructivo Nro. {bloqueEnEdicion.NumeroBloque}" : "Caracterización de Bloque Constructivo")
+                                        </div>
+                                        @if (bloqueEnEdicion != null)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0" @onclick="CancelarEdicionBloque">Cancelar Edición</button>
+                                        }
+                                    </div>
+
+                                    <div class="row g-2 align-items-end">
+                                        <div class="col-6 col-md-2">
+                                            <label class="form-label text-muted dpa-label mb-1">Nro. Bloque <span class="text-danger">*</span></label>
+                                            <input type="number" class="form-control form-control-sm text-center font-monospace fw-bold"
+                                                   @bind="nuevoBloqueNumero" min="1" max="99" disabled="@(bloqueEnEdicion != null)" />
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <label class="form-label text-muted dpa-label mb-1">Tipo Estructura <span class="text-danger">*</span></label>
+                                            <select class="form-select form-select-sm" @bind="nuevoBloqueTipoEstructuraId">
+                                                <option value="">-- Seleccionar --</option>
+                                                @foreach (var est in tiposEstructura)
+                                                {
+                                                    <option value="@est.Id">@est.Nombre</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <label class="form-label text-muted dpa-label mb-1">Estado Conservación <span class="text-danger">*</span></label>
+                                            <select class="form-select form-select-sm" @bind="nuevoBloqueEstadoConservacionId">
+                                                <option value="">-- Seleccionar --</option>
+                                                @foreach (var cons in estadosConservacion)
+                                                {
+                                                    <option value="@cons.Id">@cons.Nombre</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-6 col-md-2">
+                                            <label class="form-label text-muted dpa-label mb-1">Nro. Pisos <span class="text-danger">*</span></label>
+                                            <input type="number" class="form-control form-control-sm text-center font-monospace"
+                                                   @bind="nuevoBloqueNumeroPisos" min="1" max="50" />
+                                        </div>
+                                        <div class="col-6 col-md-2">
+                                            <label class="form-label text-muted dpa-label mb-1">Año Const. <span class="text-danger">*</span></label>
+                                            <input type="number" class="form-control form-control-sm text-center font-monospace"
+                                                   @bind="nuevoBloqueAnioConstruccion" min="1900" max="2100" />
+                                        </div>
+                                        <div class="col-6 col-md-3">
+                                            <label class="form-label text-muted dpa-label mb-1">Área Construcción (m²) <span class="text-danger">*</span></label>
+                                            <input type="number" step="0.01" class="form-control form-control-sm text-end font-monospace" placeholder="0.00"
+                                                   @bind="nuevoBloqueAreaConstruccion" />
+                                        </div>
+                                        <div class="col-md-9 d-flex justify-content-end">
+                                            <button type="button" class="btn btn-sm @(bloqueEnEdicion != null ? "btn-warning text-dark" : "btn-primary") px-4 fw-semibold" @onclick="GuardarBloqueEnLista">
+                                                <i class="bi @(bloqueEnEdicion != null ? "bi-check2-circle" : "bi-building-add") me-1"></i>
+                                                @(bloqueEnEdicion != null ? "Actualizar Bloque" : "Agregar Bloque a la Ficha")
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             }
+
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="fw-bold text-dark mb-0">
+                                    <i class="bi bi-buildings text-primary me-2"></i>Bloques Constructivos Inventariados
+                                </h6>
+                                <div class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1.5 font-monospace fw-bold">
+                                    Área Total Cubierta: @TotalAreaConstruccion.ToString("N2") m²
+                                </div>
+                            </div>
+
+                            <div class="table-responsive rounded-3 border">
+                                <table class="table table-hover align-middle mb-0 custom-table">
+                                    <thead class="table-light text-uppercase font-monospace text-muted small" style="font-size: 0.75rem;">
+                                        <tr>
+                                            <th class="ps-3 py-2 text-center">Bloque N°</th>
+                                            <th class="py-2">Estructura</th>
+                                            <th class="py-2">Estado Conservación</th>
+                                            <th class="py-2 text-center">Pisos</th>
+                                            <th class="py-2 text-center">Año</th>
+                                            <th class="py-2 text-end">Área (m²)</th>
+                                            @if (!esModoVisualizacion)
+                                            {
+                                                <th class="text-end pe-3 py-2">Acciones</th>
+                                            }
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @if (!listaBloquesMemoria.Any())
+                                        {
+                                            <tr>
+                                                <td colspan="7" class="text-center py-4 text-muted small">
+                                                    <i class="bi bi-houses display-6 d-block mb-1 opacity-50"></i>
+                                                    No se han registrado edificaciones para este predio (Lote sin construcción).
+                                                </td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var b in listaBloquesMemoria)
+                                            {
+                                                <tr class="@(bloqueEnEdicion == b ? "table-warning" : "")">
+                                                    <td class="ps-3 text-center font-monospace fw-bold text-primary">
+                                                        #@b.NumeroBloque
+                                                        @if (esModoEdicion && b.Id == null)
+                                                        {
+                                                            <span class="badge bg-success ms-1" style="font-size: 0.6rem;">NUEVO</span>
+                                                        }
+                                                    </td>
+                                                    <td class="fw-semibold text-dark">@b.NombreTipoEstructura</td>
+                                                    <td><span class="badge badge-dep text-dark">@b.NombreEstadoConservacion</span></td>
+                                                    <td class="text-center font-monospace">@b.NumeroPisos</td>
+                                                    <td class="text-center font-monospace text-secondary">@b.AnioConstruccion</td>
+                                                    <td class="text-end font-monospace fw-bold">@b.AreaConstruccion.ToString("N2") m²</td>
+                                                    @if (!esModoVisualizacion)
+                                                    {
+                                                        <td class="text-end pe-3">
+                                                            <div class="d-inline-flex gap-1">
+                                                                <button type="button" class="btn btn-sm btn-outline-primary rounded-2 py-0 px-2" title="Editar Bloque" @onclick="() => CargarBloqueParaEdicion(b)">
+                                                                    <i class="bi bi-pencil"></i>
+                                                                </button>
+                                                                <button type="button" class="btn btn-sm btn-outline-danger rounded-2 py-0 px-2" title="Quitar Bloque" @onclick="() => EliminarBloqueDeLista(b)">
+                                                                    <i class="bi bi-x-lg"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    }
+                                                </tr>
+                                            }
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- PIE DEL MODAL -->
+                        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mt-4 pt-3 border-top gap-2">
+                            <div class="small">
+                                @if (!esModoVisualizacion)
+                                {
+                                    @if (!EsTerrenoValido)
+                                    {
+                                        <span class="text-danger fw-semibold"><i class="bi bi-exclamation-circle me-1"></i>Complete los datos requeridos del terreno (Tab 1).</span>
+                                    }
+                                    else if (!EsDominioValido)
+                                    {
+                                        <span class="text-warning text-dark fw-semibold"><i class="bi bi-pie-chart-fill me-1"></i>Debe vincular al menos un propietario y sumar exactamente el 100.00% (Tab 2).</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>Ficha validada y lista para ser guardada.</span>
+                                    }
+                                }
+                            </div>
+                            <div class="d-flex gap-2 justify-content-end">
+                                <button type="button" class="btn btn-light fw-semibold text-muted px-4" @onclick="CerrarModalFicha" disabled="@procesandoModalFicha">
+                                    @(esModoVisualizacion ? "Cerrar" : "Cancelar")
+                                </button>
+                                @if (!esModoVisualizacion)
+                                {
+                                    <button type="submit" class="btn btn-primary fw-semibold shadow-sm px-4" disabled="@(!FormularioEsValido || procesandoModalFicha || dominioEnEdicion != null || bloqueEnEdicion != null)">
+                                        @if (procesandoModalFicha)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1"></span> <span>Guardando...</span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-save me-1"></i> <span>@(esModoEdicion ? "Actualizar Ficha" : "Guardar Ficha")</span>
+                                        }
+                                    </button>
+                                }
+                            </div>
                         </div>
                     </EditForm>
                 </div>
@@ -570,6 +914,15 @@
         border: 1px solid #86efac !important;
     }
 
+    .badge-dep {
+        background-color: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        font-weight: 500;
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.4rem;
+    }
+
     .shadow-hover {
         transition: transform 0.2s, box-shadow 0.2s;
     }
@@ -652,15 +1005,18 @@
     private bool toastEsExito = true;
     private CancellationTokenSource? toastCts;
 
-    // Super-Modal Ficha
+    // Super-Modal Ficha State
     private bool mostrarModalFicha = false;
     private bool procesandoModalFicha = false;
     private bool esModoVisualizacion = false;
+    private bool esModoEdicion = false;
+    private Guid? idPredioEnEdicion = null;
     private int tabActivo = 1;
     private string modalFichaErrorMensaje = string.Empty;
+
     private CreatePredioDto modeloCreacion = new();
 
-    // Segmentos DPA para Clave Catastral Visual
+    // Segmentos DPA
     private string ccProvincia = "10";
     private string ccCanton = "02";
     private string ccParroquia = "50";
@@ -674,10 +1030,70 @@
 
     private int TotalDigitosEsperados => modeloCreacion.TipoPredio == TipoPredio.Urbano ? 24 : 19;
 
-    // Catálogos cargados en segundo plano
+    private bool EsTerrenoValido =>
+        modeloCreacion.ClaveCatastral.Length == TotalDigitosEsperados &&
+        modeloCreacion.AreaTerrenoEscritura > 0 &&
+        !string.IsNullOrWhiteSpace(modeloCreacion.Direccion);
+
+    private bool EsDominioValido =>
+        listaDominiosMemoria.Any() && TotalPorcentajeDominios == 100.00m;
+
+    private bool FormularioEsValido => EsTerrenoValido && EsDominioValido;
+
+    // Catálogos
     private List<CatalogoDto> tiposTenencia = new();
     private List<CatalogoDto> tiposEstructura = new();
     private List<CatalogoDto> estadosConservacion = new();
+
+    // --- DOMINIOS EN MEMORIA Y LÓGICA DE EDICIÓN INLINE ---
+    private string cedulaBusquedaDominio = string.Empty;
+    private bool buscandoPropietario = false;
+    private string mensajeBusquedaPropietario = string.Empty;
+    private PropietarioDto? propietarioEncontrado = null;
+    private Guid? nuevoDominioTipoTenenciaId = null;
+    private decimal nuevoDominioPorcentaje = 100.00m;
+    private string nuevoDominioNotaria = string.Empty;
+
+    private ItemDominioMemoria? dominioEnEdicion = null; // Nuevo control para edición inline
+
+    public class ItemDominioMemoria
+    {
+        public Guid? Id { get; set; }
+        public Guid PropietarioId { get; set; }
+        public string Identificacion { get; set; } = string.Empty;
+        public string NombrePropietario { get; set; } = string.Empty;
+        public Guid TipoTenenciaId { get; set; }
+        public string NombreTipoTenencia { get; set; } = string.Empty;
+        public decimal PorcentajePropiedad { get; set; }
+        public string? Notaria { get; set; }
+    }
+    private List<ItemDominioMemoria> listaDominiosMemoria = new();
+    private decimal TotalPorcentajeDominios => listaDominiosMemoria.Sum(d => d.PorcentajePropiedad);
+
+    // --- BLOQUES EN MEMORIA Y LÓGICA DE EDICIÓN INLINE ---
+    private int nuevoBloqueNumero = 1;
+    private Guid? nuevoBloqueTipoEstructuraId = null;
+    private Guid? nuevoBloqueEstadoConservacionId = null;
+    private int nuevoBloqueNumeroPisos = 1;
+    private int nuevoBloqueAnioConstruccion = DateTime.Now.Year;
+    private decimal nuevoBloqueAreaConstruccion = 0.00m;
+
+    private ItemBloqueMemoria? bloqueEnEdicion = null; // Nuevo control para edición inline
+
+    public class ItemBloqueMemoria
+    {
+        public Guid? Id { get; set; }
+        public int NumeroBloque { get; set; }
+        public Guid TipoEstructuraId { get; set; }
+        public string NombreTipoEstructura { get; set; } = string.Empty;
+        public Guid EstadoConservacionId { get; set; }
+        public string NombreEstadoConservacion { get; set; } = string.Empty;
+        public int NumeroPisos { get; set; }
+        public decimal AreaConstruccion { get; set; }
+        public int AnioConstruccion { get; set; }
+    }
+    private List<ItemBloqueMemoria> listaBloquesMemoria = new();
+    private decimal TotalAreaConstruccion => listaBloquesMemoria.Sum(b => b.AreaConstruccion);
 
     private PredioDto? predioAEstadoCambiar = null;
 
@@ -694,136 +1110,311 @@
             var taskTenencia = CatalogoService.ObtenerTiposTenenciaAsync();
             var taskEstructura = CatalogoService.ObtenerTiposEstructuraAsync();
             var taskConservacion = CatalogoService.ObtenerEstadosConservacionAsync();
-
             await Task.WhenAll(taskTenencia, taskEstructura, taskConservacion);
 
             tiposTenencia = await taskTenencia;
             tiposEstructura = await taskEstructura;
             estadosConservacion = await taskConservacion;
         }
-        catch
-        {
-            // Silencioso en background
-        }
+        catch { }
     }
 
     private async Task CargarPrediosPaginados()
     {
         cargando = true;
-        bool? estadoActivo = filtroEstadoTexto switch
-        {
-            "ACTIVO" => true,
-            "INACTIVO" => false,
-            _ => null
-        };
+        bool? estadoActivo = filtroEstadoTexto switch { "ACTIVO" => true, "INACTIVO" => false, _ => null };
+        TipoPredio? tipoP = filtroTipoPredioTexto switch { "URBANO" => TipoPredio.Urbano, "RURAL" => TipoPredio.Rural, _ => null };
 
-        TipoPredio? tipoP = filtroTipoPredioTexto switch
-        {
-            "URBANO" => TipoPredio.Urbano,
-            "RURAL" => TipoPredio.Rural,
-            _ => null
-        };
-
-        resultadoPaginado = await PredioService.ObtenerPaginadoAsync(
-            busquedaFiltro,
-            estadoActivo,
-            tipoP,
-            paginaActual,
-            registrosPorPagina);
-
+        resultadoPaginado = await PredioService.ObtenerPaginadoAsync(busquedaFiltro, estadoActivo, tipoP, paginaActual, registrosPorPagina);
         cargando = false;
     }
 
     private void OnBusquedaKeyUp(KeyboardEventArgs e)
     {
         _debounceTimer?.Dispose();
-        _debounceTimer = new Timer(_ =>
-        {
-            InvokeAsync(async () =>
-            {
-                paginaActual = 1;
-                await CargarPrediosPaginados();
-                StateHasChanged();
-            });
-        }, null, 350, Timeout.Infinite);
+        _debounceTimer = new Timer(_ => { InvokeAsync(async () => { paginaActual = 1; await CargarPrediosPaginados(); StateHasChanged(); }); }, null, 350, Timeout.Infinite);
     }
 
-    private async Task OnFiltrosCambiados()
-    {
-        paginaActual = 1;
-        await CargarPrediosPaginados();
-    }
-
-    private async Task LimpiarFiltros()
-    {
-        busquedaFiltro = string.Empty;
-        filtroEstadoTexto = "TODOS";
-        filtroTipoPredioTexto = "TODOS";
-        paginaActual = 1;
-        await CargarPrediosPaginados();
-    }
-
-    private async Task CambiarPagina(int nuevaPagina)
-    {
-        if (nuevaPagina < 1 || (resultadoPaginado != null && nuevaPagina > resultadoPaginado.TotalPaginas)) return;
-        paginaActual = nuevaPagina;
-        await CargarPrediosPaginados();
-    }
-
-    private async Task OnCambiarRegistrosPorPagina(ChangeEventArgs e)
-    {
-        if (int.TryParse(e.Value?.ToString(), out int nuevoTam))
-        {
-            registrosPorPagina = nuevoTam;
-            paginaActual = 1;
-            await CargarPrediosPaginados();
-        }
-    }
+    private async Task OnFiltrosCambiados() { paginaActual = 1; await CargarPrediosPaginados(); }
+    private async Task LimpiarFiltros() { busquedaFiltro = string.Empty; filtroEstadoTexto = "TODOS"; filtroTipoPredioTexto = "TODOS"; paginaActual = 1; await CargarPrediosPaginados(); }
+    private async Task CambiarPagina(int nuevaPagina) { if (nuevaPagina < 1 || (resultadoPaginado != null && nuevaPagina > resultadoPaginado.TotalPaginas)) return; paginaActual = nuevaPagina; await CargarPrediosPaginados(); }
+    private async Task OnCambiarRegistrosPorPagina(ChangeEventArgs e) { if (int.TryParse(e.Value?.ToString(), out int nuevoTam)) { registrosPorPagina = nuevoTam; paginaActual = 1; await CargarPrediosPaginados(); } }
 
     private void AbrirModalCrearFicha()
     {
-        modeloCreacion = new CreatePredioDto
-        {
-            TipoPredio = TipoPredio.Urbano
-        };
+        esModoVisualizacion = false;
+        esModoEdicion = false;
+        idPredioEnEdicion = null;
 
+        modeloCreacion = new CreatePredioDto { TipoPredio = TipoPredio.Urbano };
         ResetearSegmentos();
         SincronizarClaveDesdeSegmentos();
 
+        listaDominiosMemoria.Clear();
+        listaBloquesMemoria.Clear();
+        ResetearFormularioDominio();
+        ResetearFormularioBloque();
+
         modalFichaErrorMensaje = string.Empty;
-        esModoVisualizacion = false;
         tabActivo = 1;
         mostrarModalFicha = true;
     }
 
-    private void VerDetallePredio(PredioDto predio)
+    private async Task VerDetallePredio(PredioDto predioResumen)
     {
+        await CargarFichaParaModal(predioResumen);
+        esModoVisualizacion = true;
+        esModoEdicion = false;
+    }
+
+    private async Task EditarPredio(PredioDto predioResumen)
+    {
+        await CargarFichaParaModal(predioResumen);
+        esModoVisualizacion = false;
+        esModoEdicion = true;
+        idPredioEnEdicion = predioResumen.Id;
+    }
+
+    private async Task CargarFichaParaModal(PredioDto predioResumen)
+    {
+        procesandoModalFicha = true;
+        mostrarModalFicha = true;
+        tabActivo = 1;
+        modalFichaErrorMensaje = string.Empty;
+        dominioEnEdicion = null;
+        bloqueEnEdicion = null;
+
+        var predioCompleto = await PredioService.ObtenerPorIdAsync(predioResumen.Id) ?? predioResumen;
+
         modeloCreacion = new CreatePredioDto
         {
-            ClaveCatastral = predio.ClaveCatastral,
-            ClaveAnterior = predio.ClaveAnterior,
-            TipoPredio = predio.TipoPredio,
-            AreaTerrenoEscritura = predio.AreaTerrenoEscritura,
-            AreaTerrenoGrafica = predio.AreaTerrenoGrafica,
-            Direccion = predio.Direccion,
-            PoligonoWkt = predio.PoligonoWkt
+            ClaveCatastral = predioCompleto.ClaveCatastral,
+            ClaveAnterior = predioCompleto.ClaveAnterior,
+            TipoPredio = predioCompleto.TipoPredio,
+            AreaTerrenoEscritura = predioCompleto.AreaTerrenoEscritura,
+            AreaTerrenoGrafica = predioCompleto.AreaTerrenoGrafica,
+            Direccion = predioCompleto.Direccion,
+            PoligonoWkt = predioCompleto.PoligonoWkt
         };
 
-        ParsearClaveASegmentos(predio.ClaveCatastral);
+        ParsearClaveASegmentos(predioCompleto.ClaveCatastral);
 
-        modalFichaErrorMensaje = string.Empty;
-        esModoVisualizacion = true;
-        tabActivo = 1;
-        mostrarModalFicha = true;
+        listaDominiosMemoria = (predioCompleto.Dominios ?? new()).Select(d => new ItemDominioMemoria
+        {
+            Id = d.Id,
+            PropietarioId = d.PropietarioId,
+            Identificacion = d.IdentificacionPropietario,
+            NombrePropietario = d.NombrePropietario,
+            TipoTenenciaId = d.TipoTenenciaId,
+            NombreTipoTenencia = d.NombreTipoTenencia,
+            PorcentajePropiedad = d.PorcentajePropiedad,
+            Notaria = d.Notaria
+        }).ToList();
+
+        listaBloquesMemoria = (predioCompleto.Bloques ?? new()).Select(b => new ItemBloqueMemoria
+        {
+            Id = b.Id,
+            NumeroBloque = b.NumeroBloque,
+            TipoEstructuraId = b.TipoEstructuraId,
+            NombreTipoEstructura = b.NombreTipoEstructura,
+            EstadoConservacionId = b.EstadoConservacionId,
+            NombreEstadoConservacion = b.NombreEstadoConservacion,
+            NumeroPisos = b.NumeroPisos,
+            AreaConstruccion = b.AreaConstruccion,
+            AnioConstruccion = b.AnioConstruccion
+        }).ToList();
+
+        ResetearFormularioDominio();
+        ResetearFormularioBloque();
+        procesandoModalFicha = false;
     }
 
     private void CerrarModalFicha() => mostrarModalFicha = false;
 
-    // --- LÓGICA DE CONTROL SEGMENTADO DE CLAVE DPA ---
-    private void OnTipoPredioCambiado()
+    // --- LÓGICA DE EDICIÓN INLINE: DOMINIOS ---
+    private async Task OnCedulaBusquedaKeyUp(KeyboardEventArgs e) { if (e.Key == "Enter") await BuscarPropietarioPorCedula(); }
+
+    private async Task BuscarPropietarioPorCedula()
     {
-        SincronizarClaveDesdeSegmentos();
+        if (string.IsNullOrWhiteSpace(cedulaBusquedaDominio)) return;
+        buscandoPropietario = true; mensajeBusquedaPropietario = string.Empty; propietarioEncontrado = null;
+        try
+        {
+            var p = await PropietarioService.ObtenerPorIdentificacionAsync(cedulaBusquedaDominio.Trim());
+            if (p != null) { propietarioEncontrado = p; if (!nuevoDominioTipoTenenciaId.HasValue && tiposTenencia.Any()) nuevoDominioTipoTenenciaId = tiposTenencia.First().Id; }
+            else mensajeBusquedaPropietario = $"No existe ningún propietario registrado con la identificación '{cedulaBusquedaDominio}'.";
+        }
+        catch (Exception ex) { mensajeBusquedaPropietario = $"Error de consulta: {ex.Message}"; }
+        finally { buscandoPropietario = false; }
     }
+
+    private void CargarDominioParaEdicion(ItemDominioMemoria item)
+    {
+        dominioEnEdicion = item;
+        cedulaBusquedaDominio = item.Identificacion;
+
+        // Falso "PropietarioEncontrado" para no forzar la búsqueda a la base de datos si solo quiere cambiar el porcentaje
+        propietarioEncontrado = new PropietarioDto
+        {
+            Id = item.PropietarioId,
+            Identificacion = item.Identificacion,
+            NombreCompleto = item.NombrePropietario
+        };
+
+        nuevoDominioTipoTenenciaId = item.TipoTenenciaId;
+        nuevoDominioPorcentaje = item.PorcentajePropiedad;
+        nuevoDominioNotaria = item.Notaria ?? string.Empty;
+        modalFichaErrorMensaje = string.Empty;
+    }
+
+    private void CancelarEdicionDominio()
+    {
+        dominioEnEdicion = null;
+        ResetearFormularioDominio();
+    }
+
+    private void GuardarDominioEnLista()
+    {
+        if (propietarioEncontrado == null || !nuevoDominioTipoTenenciaId.HasValue) return;
+
+        // Validar si es uno nuevo y ya está en la lista
+        if (dominioEnEdicion == null && listaDominiosMemoria.Any(d => d.PropietarioId == propietarioEncontrado.Id))
+        {
+            modalFichaErrorMensaje = "El propietario ya se encuentra vinculado a este predio.";
+            return;
+        }
+
+        // Validar sumatoria del 100% al agregar o modificar
+        decimal porcentajeActualDelItem = dominioEnEdicion?.PorcentajePropiedad ?? 0;
+        decimal sumaProyectada = TotalPorcentajeDominios - porcentajeActualDelItem + nuevoDominioPorcentaje;
+
+        if (sumaProyectada > 100.00m)
+        {
+            modalFichaErrorMensaje = $"El porcentaje no puede superar el 100.00%. Actualmente sumaría {sumaProyectada.ToString("0.00")}%.";
+            return;
+        }
+
+        if (nuevoDominioPorcentaje <= 0)
+        {
+            modalFichaErrorMensaje = "El porcentaje debe ser mayor a 0%.";
+            return;
+        }
+
+        var nombreTenencia = tiposTenencia.FirstOrDefault(t => t.Id == nuevoDominioTipoTenenciaId.Value)?.Nombre ?? "Tenencia";
+
+        if (dominioEnEdicion != null)
+        {
+            // Actualizar existente (Conserva su Id de base de datos)
+            dominioEnEdicion.PropietarioId = propietarioEncontrado.Id;
+            dominioEnEdicion.Identificacion = propietarioEncontrado.Identificacion;
+            dominioEnEdicion.NombrePropietario = propietarioEncontrado.NombreCompleto;
+            dominioEnEdicion.TipoTenenciaId = nuevoDominioTipoTenenciaId.Value;
+            dominioEnEdicion.NombreTipoTenencia = nombreTenencia;
+            dominioEnEdicion.PorcentajePropiedad = nuevoDominioPorcentaje;
+            dominioEnEdicion.Notaria = nuevoDominioNotaria;
+            dominioEnEdicion = null; // Liberar estado de edición
+        }
+        else
+        {
+            // Insertar Nuevo
+            listaDominiosMemoria.Add(new ItemDominioMemoria
+            {
+                Id = null, // Delta Insert
+                PropietarioId = propietarioEncontrado.Id,
+                Identificacion = propietarioEncontrado.Identificacion,
+                NombrePropietario = propietarioEncontrado.NombreCompleto,
+                TipoTenenciaId = nuevoDominioTipoTenenciaId.Value,
+                NombreTipoTenencia = nombreTenencia,
+                PorcentajePropiedad = nuevoDominioPorcentaje,
+                Notaria = nuevoDominioNotaria
+            });
+        }
+
+        ResetearFormularioDominio();
+    }
+
+    private void EliminarDominioDeLista(ItemDominioMemoria item) => listaDominiosMemoria.Remove(item);
+
+    private void ResetearFormularioDominio()
+    {
+        propietarioEncontrado = null;
+        cedulaBusquedaDominio = string.Empty;
+        nuevoDominioNotaria = string.Empty;
+        modalFichaErrorMensaje = string.Empty;
+        decimal restante = 100.00m - TotalPorcentajeDominios;
+        nuevoDominioPorcentaje = restante > 0 ? restante : 100.00m;
+    }
+
+    // --- LÓGICA DE EDICIÓN INLINE: BLOQUES ---
+    private void CargarBloqueParaEdicion(ItemBloqueMemoria item)
+    {
+        bloqueEnEdicion = item;
+        nuevoBloqueNumero = item.NumeroBloque;
+        nuevoBloqueTipoEstructuraId = item.TipoEstructuraId;
+        nuevoBloqueEstadoConservacionId = item.EstadoConservacionId;
+        nuevoBloqueNumeroPisos = item.NumeroPisos;
+        nuevoBloqueAreaConstruccion = item.AreaConstruccion;
+        nuevoBloqueAnioConstruccion = item.AnioConstruccion;
+        modalFichaErrorMensaje = string.Empty;
+    }
+
+    private void CancelarEdicionBloque()
+    {
+        bloqueEnEdicion = null;
+        ResetearFormularioBloque();
+    }
+
+    private void GuardarBloqueEnLista()
+    {
+        if (!nuevoBloqueTipoEstructuraId.HasValue || !nuevoBloqueEstadoConservacionId.HasValue) { modalFichaErrorMensaje = "Seleccione estructura y conservación."; return; }
+        if (nuevoBloqueAreaConstruccion <= 0) { modalFichaErrorMensaje = "El área debe ser mayor a 0 m²."; return; }
+
+        var nombreEstructura = tiposEstructura.FirstOrDefault(e => e.Id == nuevoBloqueTipoEstructuraId.Value)?.Nombre ?? "Estructura";
+        var nombreConservacion = estadosConservacion.FirstOrDefault(c => c.Id == nuevoBloqueEstadoConservacionId.Value)?.Nombre ?? "Conservación";
+
+        if (bloqueEnEdicion != null)
+        {
+            // Actualizar existente
+            bloqueEnEdicion.TipoEstructuraId = nuevoBloqueTipoEstructuraId.Value;
+            bloqueEnEdicion.NombreTipoEstructura = nombreEstructura;
+            bloqueEnEdicion.EstadoConservacionId = nuevoBloqueEstadoConservacionId.Value;
+            bloqueEnEdicion.NombreEstadoConservacion = nombreConservacion;
+            bloqueEnEdicion.NumeroPisos = nuevoBloqueNumeroPisos;
+            bloqueEnEdicion.AreaConstruccion = nuevoBloqueAreaConstruccion;
+            bloqueEnEdicion.AnioConstruccion = nuevoBloqueAnioConstruccion;
+            bloqueEnEdicion = null; // Liberar estado de edición
+        }
+        else
+        {
+            // Insertar Nuevo
+            listaBloquesMemoria.Add(new ItemBloqueMemoria
+            {
+                Id = null, // Delta Insert
+                NumeroBloque = nuevoBloqueNumero,
+                TipoEstructuraId = nuevoBloqueTipoEstructuraId.Value,
+                NombreTipoEstructura = nombreEstructura,
+                EstadoConservacionId = nuevoBloqueEstadoConservacionId.Value,
+                NombreEstadoConservacion = nombreConservacion,
+                NumeroPisos = nuevoBloqueNumeroPisos,
+                AreaConstruccion = nuevoBloqueAreaConstruccion,
+                AnioConstruccion = nuevoBloqueAnioConstruccion
+            });
+        }
+
+        ResetearFormularioBloque();
+    }
+
+    private void EliminarBloqueDeLista(ItemBloqueMemoria item) => listaBloquesMemoria.Remove(item);
+
+    private void ResetearFormularioBloque()
+    {
+        nuevoBloqueNumero = listaBloquesMemoria.Any() ? listaBloquesMemoria.Max(b => b.NumeroBloque) + 1 : 1;
+        nuevoBloqueAreaConstruccion = 0.00m;
+        modalFichaErrorMensaje = string.Empty;
+    }
+
+    // --- SEGMENTOS DPA ---
+    private void OnTipoPredioCambiado() => SincronizarClaveDesdeSegmentos();
 
     private void OnSegmentoInput(ChangeEventArgs e, int segmentoIndex)
     {
@@ -843,44 +1434,26 @@
             case 9: ccPiso = soloNumeros; break;
             case 10: ccUnidad = soloNumeros; break;
         }
-
         SincronizarClaveDesdeSegmentos();
     }
 
     private void SincronizarClaveDesdeSegmentos()
     {
         if (modeloCreacion.TipoPredio == TipoPredio.Urbano)
-        {
             modeloCreacion.ClaveCatastral = $"{ccProvincia}{ccCanton}{ccParroquia}{ccZona}{ccSector}{ccManzanaPoligono}{ccPredio}{ccBloque}{ccPiso}{ccUnidad}".Trim();
-        }
         else
-        {
             modeloCreacion.ClaveCatastral = $"{ccProvincia}{ccCanton}{ccParroquia}{ccZona}{ccSector}{ccManzanaPoligono}{ccPredio}{ccUnidad}".Trim();
-        }
     }
 
     private void ResetearSegmentos()
     {
-        ccProvincia = "10";
-        ccCanton = "02";
-        ccParroquia = "50";
-        ccZona = "01";
-        ccSector = "01";
-        ccManzanaPoligono = "001";
-        ccPredio = "001";
-        ccBloque = "000";
-        ccPiso = "00";
-        ccUnidad = "000";
+        ccProvincia = "10"; ccCanton = "02"; ccParroquia = "50"; ccZona = "01"; ccSector = "01";
+        ccManzanaPoligono = "001"; ccPredio = "001"; ccBloque = "000"; ccPiso = "00"; ccUnidad = "000";
     }
 
     private void ParsearClaveASegmentos(string clave)
     {
-        if (string.IsNullOrWhiteSpace(clave) || clave.Length < 19)
-        {
-            ResetearSegmentos();
-            return;
-        }
-
+        if (string.IsNullOrWhiteSpace(clave) || clave.Length < 19) { ResetearSegmentos(); return; }
         try
         {
             ccProvincia = clave.Length >= 2 ? clave.Substring(0, 2) : "10";
@@ -897,43 +1470,101 @@
                 ccPiso = clave.Length >= 21 ? clave.Substring(19, 2) : "00";
                 ccUnidad = clave.Length >= 24 ? clave.Substring(21, 3) : "000";
             }
-            else
-            {
-                ccUnidad = clave.Length >= 19 ? clave.Substring(16, 3) : "000";
-                ccBloque = "000";
-                ccPiso = "00";
-            }
+            else { ccUnidad = clave.Length >= 19 ? clave.Substring(16, 3) : "000"; ccBloque = "000"; ccPiso = "00"; }
         }
-        catch
-        {
-            // Respaldo en caso de formato no estándar
-        }
+        catch { }
     }
 
+    // 🔥 GUARDADO INTELIGENTE (CREA O ACTUALIZA) 🔥
     private async Task GuardarFichaCatastral()
     {
         SincronizarClaveDesdeSegmentos();
+
+        if (!FormularioEsValido)
+        {
+            modalFichaErrorMensaje = "Verifique que todos los datos del terreno estén completos y que los dominios sumen exactamente el 100.00%.";
+            return;
+        }
+
         procesandoModalFicha = true;
         modalFichaErrorMensaje = string.Empty;
 
         try
         {
-            var resultado = await PredioService.CrearPredioBaseAsync(modeloCreacion);
+            OperacionResultadoDto resultado;
 
-            if (resultado.Exitoso)
+            if (esModoEdicion && idPredioEnEdicion.HasValue)
             {
-                CerrarModalFicha();
-                await CargarPrediosPaginados();
-                await MostrarToast("Ficha predial base registrada correctamente.", true);
+                // Mapeo hacia el DTO de Update (Deltas)
+                var fichaActualizar = new UpdateFichaCatastralDto
+                {
+                    Id = idPredioEnEdicion.Value,
+                    Predio = modeloCreacion,
+                    Dominios = listaDominiosMemoria.Select(d => new UpdateDominioDto
+                    {
+                        Id = d.Id,
+                        PropietarioId = d.PropietarioId,
+                        TipoTenenciaId = d.TipoTenenciaId,
+                        PorcentajePropiedad = d.PorcentajePropiedad,
+                        Notaria = d.Notaria,
+                        FechaInscripcion = DateTime.UtcNow
+                    }).ToList(),
+                    Bloques = listaBloquesMemoria.Select(b => new UpdateBloqueDto
+                    {
+                        Id = b.Id,
+                        NumeroBloque = b.NumeroBloque,
+                        TipoEstructuraId = b.TipoEstructuraId,
+                        EstadoConservacionId = b.EstadoConservacionId,
+                        NumeroPisos = b.NumeroPisos,
+                        AreaConstruccion = b.AreaConstruccion,
+                        AnioConstruccion = b.AnioConstruccion
+                    }).ToList()
+                };
+
+                resultado = await PredioService.ActualizarFichaCompletaAsync(idPredioEnEdicion.Value, fichaActualizar);
             }
             else
             {
-                modalFichaErrorMensaje = resultado.Mensaje ?? "No se pudo registrar la ficha predial.";
+                // Mapeo hacia el DTO de Create
+                var fichaNueva = new CreateFichaCatastralDto
+                {
+                    Predio = modeloCreacion,
+                    Dominios = listaDominiosMemoria.Select(d => new AddDominioDto
+                    {
+                        PropietarioId = d.PropietarioId,
+                        TipoTenenciaId = d.TipoTenenciaId,
+                        PorcentajePropiedad = d.PorcentajePropiedad,
+                        Notaria = d.Notaria,
+                        FechaInscripcion = DateTime.UtcNow
+                    }).ToList(),
+                    Bloques = listaBloquesMemoria.Select(b => new AddBloqueDto
+                    {
+                        NumeroBloque = b.NumeroBloque,
+                        TipoEstructuraId = b.TipoEstructuraId,
+                        EstadoConservacionId = b.EstadoConservacionId,
+                        NumeroPisos = b.NumeroPisos,
+                        AreaConstruccion = b.AreaConstruccion,
+                        AnioConstruccion = b.AnioConstruccion
+                    }).ToList()
+                };
+
+                resultado = await PredioService.GuardarFichaCompletaAsync(fichaNueva);
+            }
+
+            if (resultado.Exitoso)
+            {
+                mostrarModalFicha = false;
+                await CargarPrediosPaginados();
+                await MostrarToast(resultado.Mensaje ?? "Operación completada exitosamente.", true);
+            }
+            else
+            {
+                modalFichaErrorMensaje = resultado.Mensaje ?? "Ocurrió un error al procesar la ficha.";
             }
         }
         catch (Exception ex)
         {
-            modalFichaErrorMensaje = $"Error al procesar la solicitud: {ex.Message}";
+            modalFichaErrorMensaje = $"Error inesperado al comunicarse con el servidor: {ex.Message}";
         }
         finally
         {
@@ -941,49 +1572,25 @@
         }
     }
 
-    private void SolicitarCambioEstado(PredioDto predio)
-    {
-        predioAEstadoCambiar = predio;
-    }
+    private void SolicitarCambioEstado(PredioDto predio) => predioAEstadoCambiar = predio;
 
     private async Task ConfirmarCambioEstado()
     {
         if (predioAEstadoCambiar == null) return;
-
-        var p = predioAEstadoCambiar;
-        predioAEstadoCambiar = null;
+        var p = predioAEstadoCambiar; predioAEstadoCambiar = null;
 
         var resultado = await PredioService.CambiarEstadoAsync(p.Id);
-
-        if (resultado.Exitoso)
-        {
-            await CargarPrediosPaginados();
-            await MostrarToast(resultado.Mensaje ?? "Estado del predio actualizado correctamente.", true);
-        }
-        else
-        {
-            await MostrarToast(resultado.Mensaje ?? "No se pudo cambiar el estado del predio.", false);
-        }
+        if (resultado.Exitoso) { await CargarPrediosPaginados(); await MostrarToast(resultado.Mensaje ?? "Estado actualizado.", true); }
+        else { await MostrarToast(resultado.Mensaje ?? "No se pudo cambiar el estado.", false); }
     }
 
     private async Task MostrarToast(string mensaje, bool esExito = true)
     {
-        toastCts?.Cancel();
-        toastCts = new CancellationTokenSource();
-        toastMensaje = mensaje;
-        toastEsExito = esExito;
-        StateHasChanged();
-
-        try
-        {
-            await Task.Delay(4000, toastCts.Token);
-            toastMensaje = string.Empty;
-            StateHasChanged();
-        }
-        catch (TaskCanceledException) { }
+        toastCts?.Cancel(); toastCts = new CancellationTokenSource();
+        toastMensaje = mensaje; toastEsExito = esExito; StateHasChanged();
+        try { await Task.Delay(4000, toastCts.Token); toastMensaje = string.Empty; StateHasChanged(); } catch { }
     }
 
     private void OcultarToast() => toastMensaje = string.Empty;
-
     private string ShortGuid(Guid id) => id.ToString().Length > 8 ? id.ToString().Substring(0, 8) + "..." : id.ToString();
 }
