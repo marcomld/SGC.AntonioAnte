@@ -1,9 +1,11 @@
+using Microsoft.OpenApi.Models;
 using SGC.AntonioAnte.API.Infrastructure;
 using SGC.AntonioAnte.API.Services;
 using SGC.AntonioAnte.Application; // Asegúrate de importar el namespace donde está el DependencyInjection
 using SGC.AntonioAnte.Application.Common.Interfaces;
 using SGC.AntonioAnte.Infrastructure;
-using Microsoft.OpenApi.Models;
+using SGC.AntonioAnte.Infrastructure.Persistence;
+using SGC.AntonioAnte.Infrastructure.Persistence.Seeders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,6 +72,28 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// =========================================================================
+// EJECUCIÓN AUTOMÁTICA DE SEMILLA GEOESPACIAL (MÓDULO 3 - GIS)
+// =========================================================================
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        var context = services.GetRequiredService<ApplicationDbContext>();
+        await CatastroSeeder.SeedAsync(context, logger);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error crítico durante la inicialización del Seeder Catastral.");
+    }
+}
+// =========================================================================
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
