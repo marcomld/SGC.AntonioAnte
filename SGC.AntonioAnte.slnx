@@ -19,6 +19,9 @@
     <File Path="Plan_Maestro_Modulo_2_Backend.md" />
     <File Path="Resumen_Modulo2_Ficha_Catastral_Core_MVP-v2.md" />
   </Folder>
+  <Folder Name="/docs/M3_VisorGIS/">
+    <File Path="Plan_Maestro_Módulo_3_Visor_Geoespacial.md" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="SGC.AntonioAnte.API/SGC.AntonioAnte.API.csproj" Id="b5fe65c6-86b6-4bc4-a8c7-823418a27c93" />
     <Project Path="SGC.AntonioAnte.Application/SGC.AntonioAnte.Application.csproj" Id="469a5d98-36c6-4337-b216-449240e9095c" />
