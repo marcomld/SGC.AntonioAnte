@@ -44,5 +44,16 @@ namespace SGC.AntonioAnte.Domain.Catastro.Entities
                 Notaria = notaria
             };
         }
+
+        public void Actualizar(Guid tipoTenenciaId, decimal porcentaje, DateTime? fechaInscripcion, string? notaria)
+        {
+            if (porcentaje <= 0 || porcentaje > 100)
+                throw new ArgumentException("El porcentaje de propiedad debe estar entre 0.01 y 100.");
+
+            TipoTenenciaId = tipoTenenciaId;
+            PorcentajePropiedad = porcentaje;
+            FechaInscripcion = fechaInscripcion;
+            Notaria = notaria;
+        }
     }
 }

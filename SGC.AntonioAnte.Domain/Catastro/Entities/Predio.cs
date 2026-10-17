@@ -40,14 +40,15 @@ namespace SGC.AntonioAnte.Domain.Catastro.Entities
             };
         }
 
-        public void AgregarBloque(BloqueConstruccion bloque)
+        public void ActualizarDatosTerreno(ClaveCatastral clave, string? claveAnterior, TipoPredio tipoPredio, decimal areaEscritura, decimal areaGrafica, string direccion, NetTopologySuite.Geometries.Geometry? poligono)
         {
-            Bloques.Add(bloque);
-        }
-
-        public void AgregarDominio(Dominio dominio)
-        {
-            Dominios.Add(dominio);
+            ClaveCatastral = clave;
+            ClaveAnterior = claveAnterior;
+            TipoPredio = tipoPredio;
+            AreaTerrenoEscritura = areaEscritura;
+            AreaTerrenoGrafica = areaGrafica;
+            Direccion = direccion;
+            PoligonoEspacial = poligono;
         }
     }
 }
