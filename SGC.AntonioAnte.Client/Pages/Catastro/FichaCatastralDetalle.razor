@@ -9,6 +9,8 @@
 @using SGC.AntonioAnte.Shared.DTOs.Common
 @using System.Threading
 
+@implements IDisposable
+
 @inject IPredioService PredioService
 @inject IPropietarioService PropietarioService
 @inject ICatalogoService CatalogoService
@@ -128,9 +130,15 @@
                                 <!-- WIDGET DPA COMPACTO -->
                                 <div class="d-flex align-items-center mb-1 gap-2">
                                     <label class="form-label text-muted dpa-label mb-0">Clave Catastral DPA Actual (División Política)</label>
+
+                                    <!-- 🔥 VALIDACIÓN VISUAL ESTRICTA DE LA CLAVE DPA 🔥 -->
+                                    <span class="badge @(modeloCreacion.ClaveCatastral?.Length == TotalDigitosEsperados ? "bg-success" : "bg-danger") font-monospace ms-2">
+                                        @(modeloCreacion.ClaveCatastral?.Length ?? 0) / @TotalDigitosEsperados Dígitos
+                                    </span>
+
                                     @if (Id.HasValue && !esModoVisualizacion)
                                     {
-                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size:0.60rem;">BLOQUEADO POR SEGURIDAD</span>
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-2" style="font-size:0.60rem;">BLOQUEADO POR SEGURIDAD</span>
                                     }
                                 </div>
                                 <div class="table-responsive mb-3">
@@ -186,7 +194,7 @@
                                             <tr>
                                                 <td class="fw-bold bg-light-subtle text-dark" style="font-size:0.75rem;">TERRENO</td>
                                                 <td><input type="number" step="0.01" class="form-control form-control-sm text-end border-0 px-1 py-0 fw-bold" @bind="modeloCreacion.AreaTerrenoEscritura" disabled="@(procesando || esModoVisualizacion)" /></td>
-                                                <td><input type="number" step="0.01" class="form-control form-control-sm text-end border-0 px-1 py-0 text-muted" @bind="modeloCreacion.AreaTerrenoGrafica" disabled="@(procesando || esModoVisualizacion)" /></td>
+                                                <td><input type="number" step="0.01" class="form-control form-control-sm text-end border-0 px-1 py-0 text-muted" @bind="modeloCreacion.AreaTerrenoGrafica" disabled="true" /></td>
                                             </tr>
                                             <tr>
                                                 <td class="fw-bold bg-light-subtle text-dark" style="font-size:0.75rem;">CONSTRUCCIÓN</td>
@@ -203,11 +211,16 @@
 
                                 <div>
                                     <label class="form-label text-muted dpa-label mb-1">Polígono Espacial (WKT)</label>
-                                    <InputTextArea class="form-control font-monospace text-muted bg-light border" style="height: 60px; font-size:0.75rem;" @bind-Value="modeloCreacion.PoligonoWkt" disabled="@(procesando || esModoVisualizacion)" />
+                                    <InputTextArea class="form-control font-monospace text-muted bg-light border" style="height: 60px; font-size:0.75rem;" @bind-Value="modeloCreacion.PoligonoWkt" disabled="true" />
+
+                                    <!-- 🔥 BOTÓN DEL MINI-MAPA EN MODAL 🔥 -->
+                                    <button type="button" class="btn btn-outline-primary btn-sm fw-semibold mt-2 shadow-sm" @onclick="AbrirModalMapa" disabled="@procesando">
+                                        <i class="bi bi-map me-1"></i> @(esModoVisualizacion ? "Ver Polígono en Mapa" : "Dibujar/Ver Polígono en Mapa")
+                                    </button>
                                 </div>
                             </div>
 
-                            <!-- COLUMNA DERECHA: FOTOGRAFÍA FRONTAL (UBICACIÓN EXACTA SOLICITADA) -->
+                            <!-- COLUMNA DERECHA: FOTOGRAFÍA FRONTAL -->
                             <div class="col-xl-4 d-flex flex-column">
                                 <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Evidencia Gráfica</h6>
                                 <div class="card border h-100 rounded-3 overflow-hidden bg-light d-flex flex-column justify-content-center align-items-center text-muted" style="min-height: 320px;">
@@ -334,203 +347,237 @@
                                         {
                                             <tr class="@(dominioEnEdicion == d ? "table-warning" : "")">
                                                 <td class="ps-4 font-monospace fw-bold text-secondary">
-                                                    @d.Identificacion @if (Id.HasValue && d.Id == null) {
-                                                    <span class="badge bg-success ms-1" style="font-size: 0.6rem;">NUEVO</span>
-                                                }
-                                            </td>
-                                            <td class="fw-bold text-dark">@d.NombrePropietario</td>
-                                            <td><span class="badge badge-dep text-dark">@d.NombreTipoTenencia</span></td>
-                                            <td class="text-end font-monospace fw-bold text-primary fs-6">@d.PorcentajePropiedad.ToString("0.00")%</td>
-                                            <td class="small text-muted">@(string.IsNullOrWhiteSpace(d.Notaria) ? "N/A" : d.Notaria)</td>
-                                            @if (!esModoVisualizacion)
-                                            {
-                                                <td class="text-end pe-4">
-                                                    <div class="d-inline-flex gap-1">
-                                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-2 btn-action" title="Editar" @onclick="() => CargarDominioParaEdicion(d)"><i class="bi bi-pencil"></i></button>
-                                                        <button type="button" class="btn btn-sm btn-outline-danger rounded-2 btn-action" title="Quitar" @onclick="() => EliminarDominioDeLista(d)"><i class="bi bi-trash"></i></button>
-                                                    </div>
+                                                    @d.Identificacion @if (Id.HasValue && d.Id == null)
+                                                    {
+                                                        <span class="badge bg-success ms-1" style="font-size: 0.6rem;">NUEVO</span>
+                                                    }
                                                 </td>
-                                            }
-                                        </tr>
+                                                <td class="fw-bold text-dark">@d.NombrePropietario</td>
+                                                <td><span class="badge badge-dep text-dark">@d.NombreTipoTenencia</span></td>
+                                                <td class="text-end font-monospace fw-bold text-primary fs-6">@d.PorcentajePropiedad.ToString("0.00")%</td>
+                                                <td class="small text-muted">@(string.IsNullOrWhiteSpace(d.Notaria) ? "N/A" : d.Notaria)</td>
+                                                @if (!esModoVisualizacion)
+                                                {
+                                                    <td class="text-end pe-4">
+                                                        <div class="d-inline-flex gap-1">
+                                                            <button type="button" class="btn btn-sm btn-outline-primary rounded-2 btn-action" title="Editar" @onclick="() => CargarDominioParaEdicion(d)"><i class="bi bi-pencil"></i></button>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger rounded-2 btn-action" title="Quitar" @onclick="() => EliminarDominioDeLista(d)"><i class="bi bi-trash"></i></button>
+                                                        </div>
+                                                    </td>
+                                                }
+                                            </tr>
+                                        }
                                     }
-                                }
-                            </tbody>
-                        </table>
-                        <div class="card-footer bg-light border-top py-2 px-4 d-flex justify-content-end align-items-center gap-3">
-                            <span class="fw-bold text-muted small text-uppercase">Total Alícuota Asignada:</span>
-                            <span class="fs-5 font-monospace fw-bold @(TotalPorcentajeDominios == 100.00m ? "text-success" : "text-danger")">
-                                @TotalPorcentajeDominios.ToString("0.00")%
-                            </span>
+                                </tbody>
+                            </table>
+                            <div class="card-footer bg-light border-top py-2 px-4 d-flex justify-content-end align-items-center gap-3">
+                                <span class="fw-bold text-muted small text-uppercase">Total Alícuota Asignada:</span>
+                                <span class="fs-5 font-monospace fw-bold @(TotalPorcentajeDominios == 100.00m ? "text-success" : "text-danger")">
+                                    @TotalPorcentajeDominios.ToString("0.00")%
+                                </span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- ========================================== -->
-                <!-- TAB 3: CONSTRUCCIONES (BLOQUES)            -->
-                <!-- ========================================== -->
-                <div class="@(tabActivo == 3 ? "animate-fade-in" : "d-none")">
-                    <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">3. Inventario de Bloques Constructivos</h6>
+                    <!-- ========================================== -->
+                    <!-- TAB 3: CONSTRUCCIONES (BLOQUES)            -->
+                    <!-- ========================================== -->
+                    <div class="@(tabActivo == 3 ? "animate-fade-in" : "d-none")">
+                        <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">3. Inventario de Bloques Constructivos</h6>
 
-                    @if (!esModoVisualizacion)
-                    {
-                        <div class="card border @(bloqueEnEdicion != null ? "border-warning bg-warning-subtle" : "bg-light-subtle") rounded-3 p-3 mb-4 shadow-sm">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <div class="fw-bold text-dark small">
-                                    <i class="bi @(bloqueEnEdicion != null ? "bi-pencil-square text-warning" : "bi-plus-square-fill text-primary") me-1"></i>
-                                    @(bloqueEnEdicion != null ? $"Editando Bloque Nro. {bloqueEnEdicion.NumeroBloque}" : "Caracterización de Bloque Constructivo")
+                        @if (!esModoVisualizacion)
+                        {
+                            <div class="card border @(bloqueEnEdicion != null ? "border-warning bg-warning-subtle" : "bg-light-subtle") rounded-3 p-3 mb-4 shadow-sm">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div class="fw-bold text-dark small">
+                                        <i class="bi @(bloqueEnEdicion != null ? "bi-pencil-square text-warning" : "bi-plus-square-fill text-primary") me-1"></i>
+                                        @(bloqueEnEdicion != null ? $"Editando Bloque Nro. {bloqueEnEdicion.NumeroBloque}" : "Caracterización de Bloque Constructivo")
+                                    </div>
+                                    @if (bloqueEnEdicion != null)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0" @onclick="CancelarEdicionBloque">Cancelar Edición</button>
+                                    }
                                 </div>
-                                @if (bloqueEnEdicion != null)
-                                {
-                                    <button type="button" class="btn btn-sm btn-outline-secondary py-0" @onclick="CancelarEdicionBloque">Cancelar Edición</button>
-                                }
+
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label text-muted dpa-label mb-1">Nro. Bloque <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control form-control-sm text-center font-monospace fw-bold" @bind="nuevoBloqueNumero" min="1" disabled="@(bloqueEnEdicion != null)" />
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label class="form-label text-muted dpa-label mb-1">Tipo Estructura <span class="text-danger">*</span></label>
+                                        <select class="form-select form-select-sm fw-medium" @bind="nuevoBloqueTipoEstructuraId">
+                                            <option value="">-- Seleccionar --</option>
+                                            @foreach (var est in tiposEstructura)
+                                            {
+                                                <option value="@est.Id">@est.Nombre</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label class="form-label text-muted dpa-label mb-1">Estado Conservación <span class="text-danger">*</span></label>
+                                        <select class="form-select form-select-sm fw-medium" @bind="nuevoBloqueEstadoConservacionId">
+                                            <option value="">-- Seleccionar --</option>
+                                            @foreach (var cons in estadosConservacion)
+                                            {
+                                                <option value="@cons.Id">@cons.Nombre</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label text-muted dpa-label mb-1">Pisos <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control form-control-sm text-center font-monospace" @bind="nuevoBloqueNumeroPisos" min="1" />
+                                    </div>
+                                    <div class="col-6 col-md-2">
+                                        <label class="form-label text-muted dpa-label mb-1">Año Const. <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control form-control-sm text-center font-monospace" @bind="nuevoBloqueAnioConstruccion" />
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label class="form-label text-muted dpa-label mb-1">Área (m²) <span class="text-danger">*</span></label>
+                                        <input type="number" step="0.01" class="form-control form-control-sm text-end font-monospace fw-bold" @bind="nuevoBloqueAreaConstruccion" />
+                                    </div>
+                                    <div class="col-md-9 d-flex justify-content-end">
+                                        <button type="button" class="btn btn-sm @(bloqueEnEdicion != null ? "btn-warning text-dark" : "btn-primary") px-4 fw-bold shadow-sm" @onclick="GuardarBloqueEnLista">
+                                            <i class="bi @(bloqueEnEdicion != null ? "bi-check-lg" : "bi-plus-lg") me-1"></i>
+                                            @(bloqueEnEdicion != null ? "Actualizar Bloque" : "Agregar Bloque")
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
+                        }
 
-                            <div class="row g-2 align-items-end">
-                                <div class="col-6 col-md-2">
-                                    <label class="form-label text-muted dpa-label mb-1">Nro. Bloque <span class="text-danger">*</span></label>
-                                    <input type="number" class="form-control form-control-sm text-center font-monospace fw-bold" @bind="nuevoBloqueNumero" min="1" disabled="@(bloqueEnEdicion != null)" />
-                                </div>
-                                <div class="col-6 col-md-3">
-                                    <label class="form-label text-muted dpa-label mb-1">Tipo Estructura <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm fw-medium" @bind="nuevoBloqueTipoEstructuraId">
-                                        <option value="">-- Seleccionar --</option>
-                                        @foreach (var est in tiposEstructura)
+                        <div class="table-responsive rounded-3 border">
+                            <table class="table table-hover align-middle mb-0 custom-table">
+                                <thead class="table-light text-uppercase font-monospace text-muted small" style="font-size: 0.75rem;">
+                                    <tr>
+                                        <th class="ps-4 py-3 text-center">Bloque N°</th>
+                                        <th class="py-3">Estructura</th>
+                                        <th class="py-3">Estado Conservación</th>
+                                        <th class="py-3 text-center">Pisos</th>
+                                        <th class="py-3 text-center">Año</th>
+                                        <th class="py-3 text-end">Área (m²)</th>
+                                        @if (!esModoVisualizacion)
                                         {
-                                            <option value="@est.Id">@est.Nombre</option>
+                                            <th class="text-end pe-4 py-3">Acciones</th>
                                         }
-                                    </select>
-                                </div>
-                                <div class="col-6 col-md-3">
-                                    <label class="form-label text-muted dpa-label mb-1">Estado Conservación <span class="text-danger">*</span></label>
-                                    <select class="form-select form-select-sm fw-medium" @bind="nuevoBloqueEstadoConservacionId">
-                                        <option value="">-- Seleccionar --</option>
-                                        @foreach (var cons in estadosConservacion)
+                                    </tr>
+                                </thead>
+                                <tbody style="font-size: 0.85rem;">
+                                    @if (!listaBloquesMemoria.Any())
+                                    {
+                                        <tr><td colspan="@(esModoVisualizacion ? 6 : 7)" class="text-center py-4 text-muted">No se han registrado edificaciones para este predio.</td></tr>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var b in listaBloquesMemoria)
                                         {
-                                            <option value="@cons.Id">@cons.Nombre</option>
+                                            <tr class="@(bloqueEnEdicion == b ? "table-warning" : "")">
+                                                <td class="ps-4 text-center font-monospace fw-bold text-primary">
+                                                    #@b.NumeroBloque @if (Id.HasValue && b.Id == null)
+                                                    {
+                                                        <span class="badge bg-success ms-1" style="font-size: 0.6rem;">NUEVO</span>
+                                                    }
+                                                </td>
+                                                <td class="fw-bold text-dark">@b.NombreTipoEstructura</td>
+                                                <td><span class="badge badge-dep text-dark">@b.NombreEstadoConservacion</span></td>
+                                                <td class="text-center font-monospace">@b.NumeroPisos</td>
+                                                <td class="text-center font-monospace text-secondary">@b.AnioConstruccion</td>
+                                                <td class="text-end font-monospace fw-bold fs-6">@b.AreaConstruccion.ToString("N2")</td>
+                                                @if (!esModoVisualizacion)
+                                                {
+                                                    <td class="text-end pe-4">
+                                                        <div class="d-inline-flex gap-1">
+                                                            <button type="button" class="btn btn-sm btn-outline-primary rounded-2 btn-action" title="Editar" @onclick="() => CargarBloqueParaEdicion(b)"><i class="bi bi-pencil"></i></button>
+                                                            <button type="button" class="btn btn-sm btn-outline-danger rounded-2 btn-action" title="Quitar" @onclick="() => EliminarBloqueDeLista(b)"><i class="bi bi-trash"></i></button>
+                                                        </div>
+                                                    </td>
+                                                }
+                                            </tr>
                                         }
-                                    </select>
-                                </div>
-                                <div class="col-6 col-md-2">
-                                    <label class="form-label text-muted dpa-label mb-1">Pisos <span class="text-danger">*</span></label>
-                                    <input type="number" class="form-control form-control-sm text-center font-monospace" @bind="nuevoBloqueNumeroPisos" min="1" />
-                                </div>
-                                <div class="col-6 col-md-2">
-                                    <label class="form-label text-muted dpa-label mb-1">Año Const. <span class="text-danger">*</span></label>
-                                    <input type="number" class="form-control form-control-sm text-center font-monospace" @bind="nuevoBloqueAnioConstruccion" />
-                                </div>
-                                <div class="col-6 col-md-3">
-                                    <label class="form-label text-muted dpa-label mb-1">Área (m²) <span class="text-danger">*</span></label>
-                                    <input type="number" step="0.01" class="form-control form-control-sm text-end font-monospace fw-bold" @bind="nuevoBloqueAreaConstruccion" />
-                                </div>
-                                <div class="col-md-9 d-flex justify-content-end">
-                                    <button type="button" class="btn btn-sm @(bloqueEnEdicion != null ? "btn-warning text-dark" : "btn-primary") px-4 fw-bold shadow-sm" @onclick="GuardarBloqueEnLista">
-                                        <i class="bi @(bloqueEnEdicion != null ? "bi-check-lg" : "bi-plus-lg") me-1"></i>
-                                        @(bloqueEnEdicion != null ? "Actualizar Bloque" : "Agregar Bloque")
-                                    </button>
-                                </div>
+                                    }
+                                </tbody>
+                            </table>
+                            <div class="card-footer bg-light border-top py-2 px-4 d-flex justify-content-end align-items-center gap-3">
+                                <span class="fw-bold text-muted small text-uppercase">Área Total Construida:</span>
+                                <span class="fs-5 font-monospace fw-bold text-dark">
+                                    @TotalAreaConstruccion.ToString("N2") m²
+                                </span>
                             </div>
                         </div>
-                    }
+                    </div>
 
-                    <div class="table-responsive rounded-3 border">
-                        <table class="table table-hover align-middle mb-0 custom-table">
-                            <thead class="table-light text-uppercase font-monospace text-muted small" style="font-size: 0.75rem;">
-                                <tr>
-                                    <th class="ps-4 py-3 text-center">Bloque N°</th>
-                                    <th class="py-3">Estructura</th>
-                                    <th class="py-3">Estado Conservación</th>
-                                    <th class="py-3 text-center">Pisos</th>
-                                    <th class="py-3 text-center">Año</th>
-                                    <th class="py-3 text-end">Área (m²)</th>
-                                    @if (!esModoVisualizacion)
-                                    {
-                                        <th class="text-end pe-4 py-3">Acciones</th>
-                                    }
-                                </tr>
-                            </thead>
-                            <tbody style="font-size: 0.85rem;">
-                                @if (!listaBloquesMemoria.Any())
+                    <!-- FOOTER DE GUARDADO (SOLO VISIBLE EN MODO EDICIÓN) -->
+                    @if (!esModoVisualizacion)
+                    {
+                        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mt-5 pt-3 border-top gap-3 bg-white">
+                            <div class="small">
+                                @if (!EsTerrenoValido)
                                 {
-                                    <tr><td colspan="@(esModoVisualizacion ? 6 : 7)" class="text-center py-4 text-muted">No se han registrado edificaciones para este predio.</td></tr>
+                                    <span class="text-danger fw-semibold"><i class="bi bi-exclamation-circle me-1"></i>Datos de terreno incompletos o inválidos.</span>
+                                }
+                                else if (!EsDominioValido)
+                                {
+                                    <span class="text-warning text-dark fw-semibold"><i class="bi bi-pie-chart-fill me-1"></i>Propietarios deben sumar exactamente 100.00%.</span>
                                 }
                                 else
                                 {
-                                    @foreach (var b in listaBloquesMemoria)
-                                    {
-                                        <tr class="@(bloqueEnEdicion == b ? "table-warning" : "")">
-                                            <td class="ps-4 text-center font-monospace fw-bold text-primary">#@b.NumeroBloque @if (Id.HasValue && b.Id == null) {
-                                                <span class="badge bg-success ms-1" style="font-size: 0.6rem;">NUEVO</span>
-                                            }
-                                        </td>
-                                        <td class="fw-bold text-dark">@b.NombreTipoEstructura</td>
-                                        <td><span class="badge badge-dep text-dark">@b.NombreEstadoConservacion</span></td>
-                                        <td class="text-center font-monospace">@b.NumeroPisos</td>
-                                        <td class="text-center font-monospace text-secondary">@b.AnioConstruccion</td>
-                                        <td class="text-end font-monospace fw-bold fs-6">@b.AreaConstruccion.ToString("N2")</td>
-                                        @if (!esModoVisualizacion)
-                                        {
-                                            <td class="text-end pe-4">
-                                                <div class="d-inline-flex gap-1">
-                                                    <button type="button" class="btn btn-sm btn-outline-primary rounded-2 btn-action" title="Editar" @onclick="() => CargarBloqueParaEdicion(b)"><i class="bi bi-pencil"></i></button>
-                                                    <button type="button" class="btn btn-sm btn-outline-danger rounded-2 btn-action" title="Quitar" @onclick="() => EliminarBloqueDeLista(b)"><i class="bi bi-trash"></i></button>
-                                                </div>
-                                            </td>
-                                        }
-                                    </tr>
+                                    <span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>Ficha validada y lista para ser guardada.</span>
                                 }
-                            }
-                        </tbody>
-                    </table>
-                    <div class="card-footer bg-light border-top py-2 px-4 d-flex justify-content-end align-items-center gap-3">
-                        <span class="fw-bold text-muted small text-uppercase">Área Total Construida:</span>
-                        <span class="fs-5 font-monospace fw-bold text-dark">
-                            @TotalAreaConstruccion.ToString("N2") m²
-                        </span>
-                    </div>
-                </div>
+                            </div>
+                            <div class="d-flex gap-2 justify-content-end">
+                                <button type="button" class="btn btn-light fw-semibold text-muted px-4 border shadow-sm" @onclick="Volver" disabled="@procesando">Cancelar</button>
+                                <button type="submit" class="btn btn-primary fw-bold shadow-sm px-5 py-2" disabled="@(!FormularioEsValido || procesando || dominioEnEdicion != null || bloqueEnEdicion != null)">
+                                    @if (procesando)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span> <span>Procesando...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-save me-2"></i> <span>@(Id.HasValue ? "Guardar Cambios" : "Crear Expediente Predial")</span>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </EditForm>
             </div>
-
-            <!-- FOOTER DE GUARDADO (SOLO VISIBLE EN MODO EDICIÓN) -->
-            @if (!esModoVisualizacion)
-            {
-                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mt-5 pt-3 border-top gap-3 bg-white">
-                    <div class="small">
-                        @if (!EsTerrenoValido)
-                        {
-                            <span class="text-danger fw-semibold"><i class="bi bi-exclamation-circle me-1"></i>Datos de terreno incompletos o inválidos.</span>
-                        }
-                        else if (!EsDominioValido)
-                        {
-
-                            <span class="text-warning text-dark fw-semibold"><i class="bi bi-pie-chart-fill me-1"></i>Propietarios deben sumar exactamente 100.00%.</span>
-                        }
-                        else
-                        {
-
-                            <span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>Ficha validada y lista para ser guardada.</span>
-                        }
-                    </div>
-                    <div class="d-flex gap-2 justify-content-end">
-                        <button type="button" class="btn btn-light fw-semibold text-muted px-4 border shadow-sm" @onclick="Volver" disabled="@procesando">Cancelar Edición</button>
-                        <button type="submit" class="btn btn-primary fw-bold shadow-sm px-5 py-2" disabled="@(!FormularioEsValido || procesando || dominioEnEdicion != null || bloqueEnEdicion != null)">
-                            @if (procesando)
-                            {
-                                <span class="spinner-border spinner-border-sm me-2"></span> <span>Procesando...</span>
-                            }
-                            else
-                            {
-
-                                <i class="bi bi-save me-2"></i> <span>@(Id.HasValue ? "Guardar Cambios" : "Crear Expediente Predial")</span>
-                            }
-                        </button>
-                    </div>
-                </div>
-            }
-        </EditForm>
-    </div>
-</div>
+        </div>
     }
 </div>
+
+<!-- 🔥 MODAL FLOTANTE DEL MINI-VISOR 🔥 -->
+@if (mostrarModalMapa)
+{
+    <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1080;">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-4 overflow-hidden">
+                <div class="modal-header border-0 py-3" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
+                    <h5 class="modal-title fw-bold text-white mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-map-fill text-white-50"></i>
+                        @(esModoVisualizacion ? "Visor Cartográfico del Predio" : "Trazado Geoespacial del Predio")
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" style="opacity: 0.9;" @onclick="CerrarModalMapa"></button>
+                </div>
+                <div class="modal-body p-0 position-relative" style="height: 60vh; min-height: 500px;">
+                    <!-- CONTENEDOR DEL MAPA ARCGIS -->
+                    <div id="mini-mapa-ficha" class="w-100 h-100"></div>
+
+                    @if (!esModoVisualizacion)
+                    {
+                        <div class="position-absolute bottom-0 start-0 m-3 py-2 px-3 bg-white rounded-3 shadow border" style="z-index: 10; font-size: 0.85rem;">
+                            <i class="bi bi-info-circle-fill text-primary me-1"></i> Utiliza las herramientas <i class="bi bi-pentagon mx-1"></i> o <i class="bi bi-square mx-1"></i> en la esquina superior derecha para digitalizar el predio.
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer bg-light border-top py-2 px-4">
+                    <button type="button" class="btn btn-primary px-4 fw-bold shadow-sm" @onclick="CerrarModalMapa">
+                        <i class="bi bi-check-lg me-1"></i> Aceptar y Continuar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
 
 <style>
     .dpa-label {
@@ -581,6 +628,11 @@
         font-weight: 600;
         padding: 0.35rem 0.65rem;
     }
+
+    .backdrop-blur {
+        background-color: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+    }
 </style>
 
 @code {
@@ -595,6 +647,10 @@
     private int tabActivo = 1;
     private string errorMensaje = string.Empty;
 
+    // 🔥 REFERENCIAS DEL MODAL DEL MAPA 🔥
+    private bool mostrarModalMapa = false;
+    private DotNetObjectReference<FichaCatastralDetalle>? _objRef;
+
     private CreatePredioDto modeloCreacion = new();
 
     // DPA
@@ -603,7 +659,10 @@
     private string ccPredio = "001"; private string ccBloque = "000"; private string ccPiso = "00"; private string ccUnidad = "000";
 
     private int TotalDigitosEsperados => modeloCreacion.TipoPredio == TipoPredio.Urbano ? 24 : 19;
-    private bool EsTerrenoValido => modeloCreacion.ClaveCatastral.Length == TotalDigitosEsperados && modeloCreacion.AreaTerrenoEscritura > 0 && !string.IsNullOrWhiteSpace(modeloCreacion.Direccion);
+
+    // 🔥 CORRECCIÓN: Validación Robusta de Longitud 🔥
+    private bool EsTerrenoValido => (modeloCreacion.ClaveCatastral?.Length ?? 0) == TotalDigitosEsperados && modeloCreacion.AreaTerrenoEscritura > 0 && !string.IsNullOrWhiteSpace(modeloCreacion.Direccion);
+
     private bool EsDominioValido => listaDominiosMemoria.Any() && TotalPorcentajeDominios == 100.00m;
     private bool FormularioEsValido => EsTerrenoValido && EsDominioValido;
 
@@ -659,6 +718,31 @@
         }
     }
 
+    // 🔥 FUNCIONES DEL MODAL DEL MAPA 🔥
+    private async Task AbrirModalMapa()
+    {
+        mostrarModalMapa = true;
+        StateHasChanged();
+
+        await Task.Delay(150);
+
+        _objRef = DotNetObjectReference.Create(this);
+        await JSRuntime.InvokeVoidAsync("visorGIS.initMiniMap", "mini-mapa-ficha", _objRef, esModoEdicion || !Id.HasValue, modeloCreacion.PoligonoWkt);
+    }
+
+    private void CerrarModalMapa()
+    {
+        mostrarModalMapa = false;
+    }
+
+    [JSInvokable]
+    public void ActualizarDatosEspaciales(string wkt, double areaGrafica)
+    {
+        modeloCreacion.PoligonoWkt = wkt;
+        modeloCreacion.AreaTerrenoGrafica = (decimal)areaGrafica;
+        StateHasChanged();
+    }
+
     private void HabilitarEdicion()
     {
         esModoVisualizacion = false;
@@ -710,17 +794,67 @@
     private void EliminarBloqueDeLista(ItemBloqueMemoria item) => listaBloquesMemoria.Remove(item);
     private void ResetearFormularioBloque() { nuevoBloqueNumero = listaBloquesMemoria.Any() ? listaBloquesMemoria.Max(b => b.NumeroBloque) + 1 : 1; nuevoBloqueAreaConstruccion = 0.00m; errorMensaje = string.Empty; }
 
-    // DPA
+    // 🔥 CORRECCIÓN: DPA SEGMENTOS 🔥
     private void OnTipoPredioCambiado() => SincronizarClaveDesdeSegmentos();
-    private void OnSegmentoInput(ChangeEventArgs e, int segmentoIndex) { var raw = e.Value?.ToString() ?? ""; var s = new string(raw.Where(char.IsDigit).ToArray()); switch (segmentoIndex) { case 1: ccProvincia = s; break; case 2: ccCanton = s; break; case 3: ccParroquia = s; break; case 4: ccZona = s; break; case 5: ccSector = s; break; case 6: ccManzanaPoligono = s; break; case 7: ccPredio = s; break; case 8: ccBloque = s; break; case 9: ccPiso = s; break; case 10: ccUnidad = s; break; } SincronizarClaveDesdeSegmentos(); }
-    private void SincronizarClaveDesdeSegmentos() { if (modeloCreacion.TipoPredio == TipoPredio.Urbano) modeloCreacion.ClaveCatastral = $"{ccProvincia}{ccCanton}{ccParroquia}{ccZona}{ccSector}{ccManzanaPoligono}{ccPredio}{ccBloque}{ccPiso}{ccUnidad}".Trim(); else modeloCreacion.ClaveCatastral = $"{ccProvincia}{ccCanton}{ccParroquia}{ccZona}{ccSector}{ccManzanaPoligono}{ccPredio}{ccUnidad}".Trim(); }
+    private void OnSegmentoInput(ChangeEventArgs e, int segmentoIndex)
+    {
+        var raw = e.Value?.ToString() ?? "";
+        var s = new string(raw.Where(char.IsDigit).ToArray());
+        switch (segmentoIndex)
+        {
+            case 1: ccProvincia = s; break;
+            case 2: ccCanton = s; break;
+            case 3: ccParroquia = s; break;
+            case 4: ccZona = s; break;
+            case 5: ccSector = s; break;
+            case 6: ccManzanaPoligono = s; break;
+            case 7: ccPredio = s; break;
+            case 8: ccBloque = s; break;
+            case 9: ccPiso = s; break;
+            case 10: ccUnidad = s; break;
+        }
+        SincronizarClaveDesdeSegmentos();
+    }
+
+    private void SincronizarClaveDesdeSegmentos()
+    {
+        string clave = "";
+        if (modeloCreacion.TipoPredio == TipoPredio.Urbano)
+            clave = $"{ccProvincia}{ccCanton}{ccParroquia}{ccZona}{ccSector}{ccManzanaPoligono}{ccPredio}{ccBloque}{ccPiso}{ccUnidad}";
+        else
+            clave = $"{ccProvincia}{ccCanton}{ccParroquia}{ccZona}{ccSector}{ccManzanaPoligono}{ccPredio}{ccUnidad}";
+
+        // Forzamos a quitar los espacios si es que llegan a colarse
+        modeloCreacion.ClaveCatastral = clave.Replace(" ", "");
+    }
+
     private void ResetearSegmentos() { ccProvincia = "10"; ccCanton = "02"; ccParroquia = "50"; ccZona = "01"; ccSector = "01"; ccManzanaPoligono = "001"; ccPredio = "001"; ccBloque = "000"; ccPiso = "00"; ccUnidad = "000"; }
-    private void ParsearClaveASegmentos(string c) { if (string.IsNullOrWhiteSpace(c) || c.Length < 19) { ResetearSegmentos(); return; } try { ccProvincia = c.Substring(0, 2); ccCanton = c.Substring(2, 2); ccParroquia = c.Substring(4, 2); ccZona = c.Substring(6, 2); ccSector = c.Substring(8, 2); ccManzanaPoligono = c.Substring(10, 3); ccPredio = c.Substring(13, 3); if (modeloCreacion.TipoPredio == TipoPredio.Urbano) { ccBloque = c.Substring(16, 3); ccPiso = c.Substring(19, 2); ccUnidad = c.Substring(21, 3); } else { ccUnidad = c.Substring(16, 3); ccBloque = "000"; ccPiso = "00"; } } catch { } }
+
+    private void ParsearClaveASegmentos(string c)
+    {
+        if (string.IsNullOrWhiteSpace(c) || c.Length < 19) { ResetearSegmentos(); return; }
+        try
+        {
+            ccProvincia = c.Substring(0, 2); ccCanton = c.Substring(2, 2); ccParroquia = c.Substring(4, 2); ccZona = c.Substring(6, 2); ccSector = c.Substring(8, 2); ccManzanaPoligono = c.Substring(10, 3); ccPredio = c.Substring(13, 3);
+            if (modeloCreacion.TipoPredio == TipoPredio.Urbano) { ccBloque = c.Substring(16, 3); ccPiso = c.Substring(19, 2); ccUnidad = c.Substring(21, 3); }
+            else { ccUnidad = c.Substring(16, 3); ccBloque = "000"; ccPiso = "00"; }
+        }
+        catch { }
+    }
 
     private async Task GuardarFichaCatastral()
     {
         SincronizarClaveDesdeSegmentos();
+
+        // 🔥 VALIDACIÓN ESTRICTA ADICIONAL 🔥
+        if (modeloCreacion.ClaveCatastral.Length != TotalDigitosEsperados)
+        {
+            errorMensaje = $"La clave DPA debe tener exactamente {TotalDigitosEsperados} dígitos. Revise que no haya casilleros en blanco.";
+            return;
+        }
+
         if (!FormularioEsValido) { errorMensaje = "Verifique datos de terreno y el 100% de dominios."; return; }
+
         procesando = true; errorMensaje = string.Empty;
 
         try
@@ -744,5 +878,8 @@
         finally { procesando = false; }
     }
 
-    private string ShortGuid(Guid id) => id.ToString().Substring(0, 8).ToUpper();
+    public void Dispose()
+    {
+        _objRef?.Dispose();
+    }
 }
