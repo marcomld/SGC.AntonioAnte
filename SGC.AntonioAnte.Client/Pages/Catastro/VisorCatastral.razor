@@ -101,7 +101,8 @@
     [JSInvokable]
     public void AbrirFichaDesdeMapa(string idPredio)
     {
-        NavManager.NavigateTo($"/catastro/predios?buscarId={idPredio}");
+        // Redirige al expediente en modo de solo lectura
+        NavManager.NavigateTo($"/catastro/predios/{idPredio}?modo=ver");
     }
 
     public void Dispose()
