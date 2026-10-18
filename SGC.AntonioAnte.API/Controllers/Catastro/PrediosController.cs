@@ -83,5 +83,15 @@ namespace SGC.AntonioAnte.API.Controllers.Catastro
 
             return Ok(resultado);
         }
+
+        [HttpGet("espaciales")]
+        public async Task<IActionResult> GetPrediosEspaciales(
+            [FromQuery] string? busqueda,
+            [FromQuery] SGC.AntonioAnte.Domain.Catastro.Enums.TipoPredio? tipoPredio)
+        {
+            var query = new GetPrediosEspacialesQuery(busqueda, tipoPredio);
+            var resultado = await _mediator.Send(query);
+            return Ok(new { data = resultado, mensaje = "Capa geoespacial de predios recuperada exitosamente." });
+        }
     }
 }

@@ -50,5 +50,17 @@ namespace SGC.AntonioAnte.Domain.Catastro.Entities
             Direccion = direccion;
             PoligonoEspacial = poligono;
         }
+
+        public void AgregarDominio(Dominio dominio)
+        {
+            if (dominio == null) throw new ArgumentNullException(nameof(dominio));
+            Dominios.Add(dominio);
+        }
+
+        public void AgregarBloque(BloqueConstruccion bloque)
+        {
+            if (bloque == null) throw new ArgumentNullException(nameof(bloque));
+            Bloques.Add(bloque);
+        }
     }
 }

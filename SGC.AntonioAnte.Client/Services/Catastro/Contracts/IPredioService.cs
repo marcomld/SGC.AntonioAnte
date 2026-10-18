@@ -11,5 +11,6 @@ namespace SGC.AntonioAnte.Client.Services.Catastro.Contracts
         Task<OperacionResultadoDto> GuardarFichaCompletaAsync(CreateFichaCatastralDto dto);
         Task<OperacionResultadoDto> ActualizarFichaCompletaAsync(Guid id, UpdateFichaCatastralDto dto);
         Task<OperacionResultadoDto> CambiarEstadoAsync(Guid id);
+        Task<List<PredioEspacialDto>> ObtenerEspacialesAsync(string? busqueda = null, TipoPredio? tipoPredio = null);
     }
 }

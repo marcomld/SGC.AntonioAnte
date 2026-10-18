@@ -63,6 +63,37 @@ namespace SGC.AntonioAnte.Client.Services.Catastro.Implementation
             }
         }
 
+        public async Task<List<PredioEspacialDto>> ObtenerEspacialesAsync(string? busqueda = null, TipoPredio? tipoPredio = null)
+        {
+            try
+            {
+                var url = "api/v1/catastro/predios/espaciales?";
+
+                if (!string.IsNullOrWhiteSpace(busqueda))
+                    url += $"busqueda={Uri.EscapeDataString(busqueda)}&";
+
+                if (tipoPredio.HasValue)
+                    url += $"tipoPredio={(int)tipoPredio.Value}";
+
+                var response = await _httpClient.GetAsync(url.TrimEnd('?').TrimEnd('&'));
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(content);
+
+                    if (doc.RootElement.TryGetProperty("data", out var dataElem) || doc.RootElement.TryGetProperty("Data", out dataElem))
+                    {
+                        return JsonSerializer.Deserialize<List<PredioEspacialDto>>(dataElem.GetRawText(), _jsonOptions) ?? new();
+                    }
+                }
+                return new List<PredioEspacialDto>();
+            }
+            catch
+            {
+                return new List<PredioEspacialDto>();
+            }
+        }
         public async Task<OperacionResultadoDto> GuardarFichaCompletaAsync(CreateFichaCatastralDto dto)
         {
             try
