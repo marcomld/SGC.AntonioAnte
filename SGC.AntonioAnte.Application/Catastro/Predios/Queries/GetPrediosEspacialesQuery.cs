@@ -3,10 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using SGC.AntonioAnte.Application.Common.Interfaces;
 using SGC.AntonioAnte.Domain.Catastro.Enums;
 using SGC.AntonioAnte.Shared.DTOs.Catastro.Predios;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Application.Catastro.Predios.Queries
@@ -39,20 +38,10 @@ namespace SGC.AntonioAnte.Application.Catastro.Predios.Queries
                 query = query.Where(p => p.TipoPredio == request.TipoPredio.Value);
             }
 
-            if (!string.IsNullOrWhiteSpace(request.Busqueda))
-            {
-                var termino = request.Busqueda.Trim().ToLower();
-                query = query.Where(p =>
-                    EF.Property<string>(p, "ClaveCatastral").Contains(termino) ||
-                    (p.ClaveAnterior != null && p.ClaveAnterior.ToLower().Contains(termino)) ||
-                    p.Direccion.ToLower().Contains(termino));
-            }
+            // Proyección optimizada desde SQL Server
+            var prediosCrudos = await query.ToListAsync(cancellationToken);
 
-            var predios = await query
-                .OrderBy(p => EF.Property<string>(p, "ClaveCatastral"))
-                .ToListAsync(cancellationToken);
-
-            return predios.Select(p =>
+            var resultado = prediosCrudos.Select(p =>
             {
                 var dominioPrincipal = p.Dominios
                     .Where(d => d.EstadoActivo && d.Propietario != null)
@@ -73,6 +62,20 @@ namespace SGC.AntonioAnte.Application.Catastro.Predios.Queries
                     TotalBloques = p.Bloques.Count(b => b.EstadoActivo)
                 };
             }).ToList();
+
+            // Filtrado resiliente en memoria para sortear la restricción del Value Object
+            if (!string.IsNullOrWhiteSpace(request.Busqueda))
+            {
+                var termino = request.Busqueda.Trim().ToLower();
+                resultado = resultado.Where(p =>
+                    p.ClaveCatastral.Contains(termino) ||
+                    (p.ClaveAnterior != null && p.ClaveAnterior.ToLower().Contains(termino)) ||
+                    p.Direccion.ToLower().Contains(termino) ||
+                    p.PropietarioPrincipal.ToLower().Contains(termino)
+                ).ToList();
+            }
+
+            return resultado.OrderBy(p => p.ClaveCatastral).ToList();
         }
     }
 }

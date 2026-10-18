@@ -5,13 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SGC - Antonio Ante</title>
     <base href="/" />
+
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
     <link rel="stylesheet" href="css/app.css" />
     <link href="SGC.AntonioAnte.Client.styles.css" rel="stylesheet" />
-
     <link rel="icon" type="image/png" href="favicon.png" />
+
+    <!-- 1. Wicket (Parser WKT a JSON) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/wicket/1.3.8/wicket.min.js"></script>
+
+    <!-- 2. ArcGIS CSS (SOLO CSS, SIN SCRIPT) -->
+    <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css" />
+
+    <!-- 3. Archivo Interop para Blazor -->
+    <script src="js/visorGIS.js"></script>
 </head>
 <body>
     <div id="app">
