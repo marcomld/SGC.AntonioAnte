@@ -33,5 +33,15 @@ namespace SGC.AntonioAnte.Domain.Avaluos.Entities
                 EstadoActivo = true
             };
         }
+
+        public void Actualizar(int anioFiscal, TipoPredio tipoPredio, string zona, string sector, string manzanaPoligono, decimal valorMetroCuadrado)
+        {
+            AnioFiscal = anioFiscal;
+            TipoPredio = tipoPredio;
+            Zona = zona;
+            Sector = sector;
+            ManzanaPoligono = manzanaPoligono;
+            ValorMetroCuadrado = valorMetroCuadrado;
+        }
     }
 }

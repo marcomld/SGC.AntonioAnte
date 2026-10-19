@@ -32,5 +32,14 @@ namespace SGC.AntonioAnte.Domain.Avaluos.Entities
                 EstadoActivo = true
             };
         }
+
+        public void Actualizar(int anioFiscal, Guid estadoConservacionId, int edadMinima, int edadMaxima, decimal coeficiente)
+        {
+            AnioFiscal = anioFiscal;
+            EstadoConservacionId = estadoConservacionId;
+            EdadMinima = edadMinima;
+            EdadMaxima = edadMaxima;
+            Coeficiente = coeficiente;
+        }
     }
 }

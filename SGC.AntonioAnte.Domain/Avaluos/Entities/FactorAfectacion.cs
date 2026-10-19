@@ -26,5 +26,12 @@ namespace SGC.AntonioAnte.Domain.Avaluos.Entities
                 EstadoActivo = true
             };
         }
+
+        public void Actualizar(int anioFiscal, string tipoAfectacion, decimal coeficiente)
+        {
+            AnioFiscal = anioFiscal;
+            TipoAfectacion = tipoAfectacion;
+            Coeficiente = coeficiente;
+        }
     }
 }

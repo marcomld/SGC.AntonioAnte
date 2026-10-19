@@ -28,5 +28,12 @@ namespace SGC.AntonioAnte.Domain.Avaluos.Entities
                 EstadoActivo = true
             };
         }
+
+        public void Actualizar(int anioFiscal, Guid tipoEstructuraId, decimal valorMetroCuadrado)
+        {
+            AnioFiscal = anioFiscal;
+            TipoEstructuraId = tipoEstructuraId;
+            ValorMetroCuadrado = valorMetroCuadrado;
+        }
     }
 }
