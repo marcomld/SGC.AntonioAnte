@@ -126,6 +126,243 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
                     b.ToTable("UsuarioTokens", "Seguridad");
                 });
 
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Avaluos.Entities.CostoReposicion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AnioFiscal")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CreadoPor")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("EstadoActivo")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ModificadoPor")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TipoEstructuraId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("ValorMetroCuadrado")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TipoEstructuraId");
+
+                    b.ToTable("CostosReposicion", "Avaluos");
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Avaluos.Entities.FactorAfectacion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AnioFiscal")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Coeficiente")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)");
+
+                    b.Property<string>("CreadoPor")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("EstadoActivo")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ModificadoPor")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("TipoAfectacion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("FactoresAfectacion", "Avaluos");
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Avaluos.Entities.FactorDepreciacion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AnioFiscal")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Coeficiente")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)");
+
+                    b.Property<string>("CreadoPor")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("EdadMaxima")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EdadMinima")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("EstadoActivo")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("EstadoConservacionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ModificadoPor")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EstadoConservacionId");
+
+                    b.ToTable("FactoresDepreciacion", "Avaluos");
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Avaluos.Entities.LiquidacionPredial", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AnioFiscal")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("BaseImponible")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("CemAplicada")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("CreadoPor")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("EsSimulacion")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("EstadoActivo")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("EstadoLiquidacion")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<decimal>("ExoneracionesPrevias")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ModificadoPor")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("PredioId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("ValorConstruccion")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("ValorEmision")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("ValorTerreno")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PredioId");
+
+                    b.ToTable("LiquidacionesPrediales", "Avaluos");
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Avaluos.Entities.PrecioBaseSuelo", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AnioFiscal")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CreadoPor")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("EstadoActivo")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaModificacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ManzanaPoligono")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ModificadoPor")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Sector")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("TipoPredio")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("ValorMetroCuadrado")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Zona")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("PreciosBaseSuelo", "Avaluos");
+                });
+
             modelBuilder.Entity("SGC.AntonioAnte.Domain.Catastro.Entities.BloqueConstruccion", b =>
                 {
                     b.Property<Guid>("Id")
@@ -703,6 +940,39 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Avaluos.Entities.CostoReposicion", b =>
+                {
+                    b.HasOne("SGC.AntonioAnte.Domain.Catastro.Entities.TipoEstructura", "TipoEstructura")
+                        .WithMany()
+                        .HasForeignKey("TipoEstructuraId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("TipoEstructura");
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Avaluos.Entities.FactorDepreciacion", b =>
+                {
+                    b.HasOne("SGC.AntonioAnte.Domain.Catastro.Entities.EstadoConservacion", "EstadoConservacion")
+                        .WithMany()
+                        .HasForeignKey("EstadoConservacionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("EstadoConservacion");
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Avaluos.Entities.LiquidacionPredial", b =>
+                {
+                    b.HasOne("SGC.AntonioAnte.Domain.Catastro.Entities.Predio", "Predio")
+                        .WithMany()
+                        .HasForeignKey("PredioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Predio");
                 });
 
             modelBuilder.Entity("SGC.AntonioAnte.Domain.Catastro.Entities.BloqueConstruccion", b =>
