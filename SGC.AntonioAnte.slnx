@@ -1,5 +1,7 @@
 <Solution>
   <Folder Name="/docs/">
+    <File Path="../../../OneDrive/Escritorio/docs/6_Diseno_BD_M4_Avaluos.md" />
+    <File Path="../../../OneDrive/Escritorio/docs/7_Plan_Maestro_M4_Avaluos.md" />
     <File Path="1_Plan_Maestro.md" />
     <File Path="2_Historias_Usuario_M1.md" />
     <File Path="3_Estandares_Git_y_Codigo.md" />
@@ -20,6 +22,7 @@
     <File Path="Resumen_Modulo2_Ficha_Catastral_Core_MVP-v2.md" />
   </Folder>
   <Folder Name="/docs/M3_VisorGIS/">
+    <File Path="../../../OneDrive/Escritorio/docs/Plan_Maestro_Módulo_3_Visor_Geoespacial.md" />
     <File Path="Plan_Maestro_Módulo_3_Visor_Geoespacial.md" />
   </Folder>
   <Folder Name="/src/">
