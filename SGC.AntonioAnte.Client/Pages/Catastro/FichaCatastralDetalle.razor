@@ -2,10 +2,12 @@
 @page "/catastro/predios/{Id:guid}"
 
 @using SGC.AntonioAnte.Client.Services.Catastro.Contracts
+@using SGC.AntonioAnte.Client.Services.Avaluos.Contracts
 @using SGC.AntonioAnte.Domain.Catastro.Enums
 @using SGC.AntonioAnte.Shared.DTOs.Catastro.Catalogos
 @using SGC.AntonioAnte.Shared.DTOs.Catastro.Predios
 @using SGC.AntonioAnte.Shared.DTOs.Catastro.Propietarios
+@using SGC.AntonioAnte.Shared.DTOs.Avaluos.Simulacion
 @using SGC.AntonioAnte.Shared.DTOs.Common
 @using System.Threading
 
@@ -14,10 +16,28 @@
 @inject IPredioService PredioService
 @inject IPropietarioService PropietarioService
 @inject ICatalogoService CatalogoService
+@inject IAvaluosService AvaluosService
 @inject NavigationManager NavManager
 @inject IJSRuntime JSRuntime
 
 <div class="container-fluid py-4 animate-fade-in">
+
+    <!-- TOAST FLOTANTE CORPORATIVO -->
+    @if (!string.IsNullOrEmpty(toastMensaje))
+    {
+        <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1090;">
+            <div class="toast show shadow-lg border-0 bg-white" role="alert">
+                <div class="toast-header @(toastEsExito ? "bg-success text-white" : "bg-danger text-white") border-0 py-2">
+                    <i class="bi @(toastEsExito ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-2 fs-6"></i>
+                    <strong class="me-auto">@(toastEsExito ? "Éxito" : "Atención")</strong>
+                    <button type="button" class="btn-close btn-close-white" @onclick="OcultarToast"></button>
+                </div>
+                <div class="toast-body fw-medium text-dark py-3">
+                    @toastMensaje
+                </div>
+            </div>
+        </div>
+    }
 
     @if (cargandoInicial)
     {
@@ -64,20 +84,13 @@
             </div>
         </div>
 
-        @if (!string.IsNullOrEmpty(errorMensaje))
-        {
-            <div class="alert alert-danger border-0 shadow-sm small mb-4 rounded-3 py-3" role="alert">
-                <i class="bi bi-exclamation-triangle-fill me-2 fs-5 vertical-align-middle"></i> @errorMensaje
-            </div>
-        }
-
         <!-- CUERPO DE LA FICHA: PESTAÑAS Y DISEÑO COMPACTO EMPRESARIAL -->
         <div class="card border-0 shadow-lg rounded-4 overflow-hidden bg-white">
             <div class="px-4 pt-4 pb-0 bg-white">
                 <ul class="nav nav-pills nav-fill gap-2 p-1 bg-light rounded-3 border mb-0" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link @(tabActivo == 1 ? "active fw-bold shadow-sm" : "text-secondary")" @onclick="() => tabActivo = 1" type="button">
-                            <i class="bi @(EsTerrenoValido ? "bi-check-circle-fill text-success" : "bi-geo-alt") me-1"></i> Identificación del Predio
+                            <i class="bi @(EsTerrenoValido ? "bi-check-circle-fill text-success" : "bi-geo-alt") me-1"></i> Identificación
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
@@ -95,6 +108,11 @@
                             {
                                 <span class="badge bg-primary ms-1 font-monospace">@listaBloquesMemoria.Count</span>
                             }
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(tabActivo == 4 ? "active fw-bold shadow-sm bg-success text-white" : "text-secondary")" @onclick="() => tabActivo = 4" type="button" disabled="@(!Id.HasValue)">
+                            <i class="bi bi-cash-coin me-1"></i> Valoración Económica
                         </button>
                     </li>
                 </ul>
@@ -506,6 +524,146 @@
                         </div>
                     </div>
 
+                    <!-- ========================================== -->
+                    <!-- TAB 4: VALORACIÓN ECONÓMICA (AVALÚOS)      -->
+                    <!-- ========================================== -->
+                    <div class="@(tabActivo == 4 ? "animate-fade-in" : "d-none")">
+                        <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">4. Motor de Simulación de Base Imponible</h6>
+
+                        <div class="row g-3 mb-4 align-items-end bg-light-subtle p-3 rounded-3 border">
+                            <div class="col-md-3">
+                                <label class="form-label text-muted dpa-label mb-1">Año Fiscal de Cálculo</label>
+                                <input type="number" class="form-control form-control-sm font-monospace fw-bold fs-6 text-center" @bind="anioFiscalSimulacion" min="2000" max="2100" disabled="@simulandoAvaluo" />
+                            </div>
+                            <div class="col-md-3">
+                                <button type="button" class="btn btn-sm btn-success w-100 fw-bold shadow-sm py-2" @onclick="EjecutarSimulacionAvaluo" disabled="@simulandoAvaluo">
+                                    @if (simulandoAvaluo)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span><span>Calculando...</span>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-calculator-fill me-2"></i><span>Simular Avalúo</span>
+                                    }
+                                </button>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <span class="small text-muted"><i class="bi bi-info-circle me-1 text-primary"></i>Esta simulación en memoria no genera obligaciones fiscales.</span>
+                            </div>
+                        </div>
+
+                        @if (avaluoSimuladoResult != null)
+                        {
+                            <div class="row g-4 animate-fade-in">
+                                <!-- CARD 1: AVALÚO TERRENO -->
+                                <div class="col-xl-4">
+                                    <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
+                                        <div class="card-header border-0 py-3" style="background-color: #0ea5e9; color: white;">
+                                            <h6 class="mb-0 fw-bold"><i class="bi bi-map-fill me-2"></i>Avalúo de Terreno</h6>
+                                        </div>
+                                        <div class="card-body bg-light">
+                                            <ul class="list-group list-group-flush rounded-3 border">
+                                                <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
+                                                    <span class="small text-muted fw-semibold">Área Geográfica:</span>
+                                                    <span class="font-monospace fw-bold">@avaluoSimuladoResult.AreaTerrenoTotal.ToString("N2") m²</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
+                                                    <span class="small text-muted fw-semibold">Valor Base / m²:</span>
+                                                    <span class="font-monospace fw-bold">$@avaluoSimuladoResult.ValorMetroSuelo.ToString("N2")</span>
+                                                </li>
+                                                <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
+                                                    <span class="small text-muted fw-semibold">Valor Terreno Bruto:</span>
+                                                    <span class="font-monospace fw-bold">$@avaluoSimuladoResult.ValorTerrenoBase.ToString("N2")</span>
+                                                </li>
+                                                @if (avaluoSimuladoResult.FactorAfectacionAplicado > 0)
+                                                {
+                                                    <li class="list-group-item d-flex justify-content-between align-items-center bg-white">
+                                                        <span class="small text-muted fw-semibold">Afectaciones (Castigo):</span>
+                                                        <span class="font-monospace fw-bold text-danger">-@avaluoSimuladoResult.FactorAfectacionAplicado.ToString("P2")</span>
+                                                    </li>
+                                                }
+                                                <li class="list-group-item d-flex justify-content-between align-items-center border-top border-primary" style="background-color: #e0f2fe;">
+                                                    <span class="fw-bold text-dark">SUBTOTAL SUELO:</span>
+                                                    <span class="fs-5 font-monospace fw-bold text-primary">$@avaluoSimuladoResult.AvaluoSueloFinal.ToString("N2")</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- CARD 2: AVALÚO CONSTRUCCIONES -->
+                                <div class="col-xl-8">
+                                    <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden">
+                                        <div class="card-header border-0 py-3" style="background-color: #8b5cf6; color: white;">
+                                            <h6 class="mb-0 fw-bold"><i class="bi bi-buildings-fill me-2"></i>Avalúo de Construcciones (Amortizadas)</h6>
+                                        </div>
+                                        <div class="card-body p-0 bg-white">
+                                            <div class="table-responsive">
+                                                <table class="table table-hover align-middle mb-0 custom-table">
+                                                    <thead class="table-light text-uppercase font-monospace text-muted small" style="font-size: 0.65rem;">
+                                                        <tr>
+                                                            <th class="ps-3 py-2 text-center">Blq</th>
+                                                            <th class="py-2">Estructura</th>
+                                                            <th class="py-2 text-end">Área</th>
+                                                            <th class="py-2 text-end">Costo Rep.</th>
+                                                            <th class="py-2 text-center">Edad/Est</th>
+                                                            <th class="py-2 text-center">Depreciación</th>
+                                                            <th class="pe-3 py-2 text-end">Avalúo Final</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody style="font-size: 0.8rem;">
+                                                        @if (!avaluoSimuladoResult.DesgloseBloques.Any())
+                                                        {
+                                                            <tr><td colspan="7" class="text-center py-4 text-muted">Lote sin construcciones inventariadas.</td></tr>
+                                                        }
+                                                        else
+                                                        {
+                                                            @foreach (var blq in avaluoSimuladoResult.DesgloseBloques)
+                                                            {
+                                                                <tr>
+                                                                    <td class="ps-3 text-center font-monospace fw-bold">#@blq.NumeroBloque</td>
+                                                                    <td class="fw-semibold">@blq.TipoEstructura</td>
+                                                                    <td class="text-end font-monospace">@blq.AreaConstruccion.ToString("N2") m²</td>
+                                                                    <td class="text-end font-monospace">$@blq.CostoReposicionTotal.ToString("N2")</td>
+                                                                    <td class="text-center small">
+                                                                        <span class="d-block font-monospace">@blq.EdadConstruccion años</span>
+                                                                        <span class="badge bg-light text-dark border">@blq.EstadoConservacion</span>
+                                                                    </td>
+                                                                    <td class="text-center font-monospace text-danger">-@((1 - blq.CoeficienteDepreciacion).ToString("P1"))</td>
+                                                                    <td class="pe-3 text-end font-monospace fw-bold text-dark">$@blq.AvaluoBloqueFinal.ToString("N2")</td>
+                                                                </tr>
+                                                            }
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <div class="card-footer py-2 px-3 d-flex justify-content-between align-items-center" style="background-color: #ede9fe; border-top-color: #c4b5fd;">
+                                            <span class="fw-bold" style="color: #5b21b6;">SUBTOTAL CONSTRUCCIONES:</span>
+                                            <span class="fs-5 font-monospace fw-bold" style="color: #5b21b6;">$@avaluoSimuladoResult.AvaluoEdificacionesFinal.ToString("N2")</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- CARD 3: GRAN TOTAL COMERCIAL -->
+                                <div class="col-xl-12 mt-4">
+                                    <div class="card border-0 shadow-lg rounded-4 overflow-hidden" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
+                                        <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+                                            <div class="text-white">
+                                                <h4 class="fw-bold mb-1"><i class="bi bi-bank me-2"></i>Gran Total Base Imponible Comercial</h4>
+                                                <p class="mb-0 text-white-50 small">Suma del avalúo del suelo y el bloque constructivo depreciado para el año fiscal @avaluoSimuladoResult.AnioFiscal.</p>
+                                            </div>
+                                            <div class="bg-white bg-opacity-25 rounded-4 px-4 py-3 border border-white border-opacity-25 shadow-sm text-end">
+                                                <div class="text-white text-uppercase fw-bold opacity-75" style="font-size: 0.75rem; letter-spacing: 1px;">Valor Comercial Estimado</div>
+                                                <div class="display-5 fw-bold text-white font-monospace lh-1 mt-1">$@avaluoSimuladoResult.BaseImponibleComercial.ToString("N2")</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
                     <!-- FOOTER DE GUARDADO (SOLO VISIBLE EN MODO EDICIÓN) -->
                     @if (!esModoVisualizacion)
                     {
@@ -525,7 +683,7 @@
                                 }
                             </div>
                             <div class="d-flex gap-2 justify-content-end">
-                                <button type="button" class="btn btn-light fw-semibold text-muted px-4 border shadow-sm" @onclick="Volver" disabled="@procesando">Cancelar</button>
+                                <button type="button" class="btn btn-light fw-semibold text-muted px-4 border shadow-sm" @onclick="Volver" disabled="@procesando">Cancelar Edición</button>
                                 <button type="submit" class="btn btn-primary fw-bold shadow-sm px-5 py-2" disabled="@(!FormularioEsValido || procesando || dominioEnEdicion != null || bloqueEnEdicion != null)">
                                     @if (procesando)
                                     {
@@ -647,6 +805,16 @@
     private int tabActivo = 1;
     private string errorMensaje = string.Empty;
 
+    // 🔥 ESTADO DE SIMULACIÓN DE AVALÚOS 🔥
+    private int anioFiscalSimulacion = DateTime.Now.Year;
+    private bool simulandoAvaluo = false;
+    private AvaluoSimuladoDto? avaluoSimuladoResult = null;
+
+    // 🔥 SISTEMA DE TOAST 🔥
+    private string toastMensaje = string.Empty;
+    private bool toastEsExito = true;
+    private CancellationTokenSource? toastCts;
+
     // 🔥 REFERENCIAS DEL MODAL DEL MAPA 🔥
     private bool mostrarModalMapa = false;
     private DotNetObjectReference<FichaCatastralDetalle>? _objRef;
@@ -660,7 +828,6 @@
 
     private int TotalDigitosEsperados => modeloCreacion.TipoPredio == TipoPredio.Urbano ? 24 : 19;
 
-    // 🔥 CORRECCIÓN: Validación Robusta de Longitud 🔥
     private bool EsTerrenoValido => (modeloCreacion.ClaveCatastral?.Length ?? 0) == TotalDigitosEsperados && modeloCreacion.AreaTerrenoEscritura > 0 && !string.IsNullOrWhiteSpace(modeloCreacion.Direccion);
 
     private bool EsDominioValido => listaDominiosMemoria.Any() && TotalPorcentajeDominios == 100.00m;
@@ -716,6 +883,53 @@
             SincronizarClaveDesdeSegmentos();
             cargandoInicial = false;
         }
+    }
+
+    private async Task MostrarToast(string mensaje, bool esExito = false)
+    {
+        toastCts?.Cancel();
+        toastCts = new CancellationTokenSource();
+        toastMensaje = mensaje;
+        toastEsExito = esExito;
+        StateHasChanged();
+        try
+        {
+            await Task.Delay(4000, toastCts.Token);
+            toastMensaje = string.Empty;
+            StateHasChanged();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private void OcultarToast() => toastMensaje = string.Empty;
+
+    // Redirigir errores antiguos al Toast
+    private void MostrarError(string mensaje) => _ = MostrarToast(mensaje, false);
+
+    // 🔥 EJECUCIÓN DE AVALÚOS 🔥
+    private async Task EjecutarSimulacionAvaluo()
+    {
+        if (!Id.HasValue) return;
+
+        simulandoAvaluo = true;
+        avaluoSimuladoResult = null;
+        StateHasChanged();
+
+        var respuesta = await AvaluosService.SimularAvaluoAsync(Id.Value, anioFiscalSimulacion);
+
+        if (respuesta.Exitoso && respuesta.Datos != null)
+        {
+            avaluoSimuladoResult = respuesta.Datos;
+            await MostrarToast("Simulación de avalúo calculada exitosamente.", true);
+        }
+        else
+        {
+            // Mostramos el error devuelto por la API en nuestro Toast flotante
+            await MostrarToast(respuesta.Mensaje ?? "Ocurrió un error al calcular la simulación de avalúos.", false);
+        }
+
+        simulandoAvaluo = false;
+        StateHasChanged();
     }
 
     // 🔥 FUNCIONES DEL MODAL DEL MAPA 🔥
@@ -794,7 +1008,7 @@
     private void EliminarBloqueDeLista(ItemBloqueMemoria item) => listaBloquesMemoria.Remove(item);
     private void ResetearFormularioBloque() { nuevoBloqueNumero = listaBloquesMemoria.Any() ? listaBloquesMemoria.Max(b => b.NumeroBloque) + 1 : 1; nuevoBloqueAreaConstruccion = 0.00m; errorMensaje = string.Empty; }
 
-    // 🔥 CORRECCIÓN: DPA SEGMENTOS 🔥
+    // DPA SEGMENTOS
     private void OnTipoPredioCambiado() => SincronizarClaveDesdeSegmentos();
     private void OnSegmentoInput(ChangeEventArgs e, int segmentoIndex)
     {
@@ -824,7 +1038,6 @@
         else
             clave = $"{ccProvincia}{ccCanton}{ccParroquia}{ccZona}{ccSector}{ccManzanaPoligono}{ccPredio}{ccUnidad}";
 
-        // Forzamos a quitar los espacios si es que llegan a colarse
         modeloCreacion.ClaveCatastral = clave.Replace(" ", "");
     }
 
@@ -846,7 +1059,6 @@
     {
         SincronizarClaveDesdeSegmentos();
 
-        // 🔥 VALIDACIÓN ESTRICTA ADICIONAL 🔥
         if (modeloCreacion.ClaveCatastral.Length != TotalDigitosEsperados)
         {
             errorMensaje = $"La clave DPA debe tener exactamente {TotalDigitosEsperados} dígitos. Revise que no haya casilleros en blanco.";

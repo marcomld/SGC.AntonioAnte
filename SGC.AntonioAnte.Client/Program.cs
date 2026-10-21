@@ -5,6 +5,8 @@ using SGC.AntonioAnte.Client;
 using SGC.AntonioAnte.Client.Infrastructure.Http;
 using SGC.AntonioAnte.Client.Infrastructure.Security;
 using SGC.AntonioAnte.Client.Services;
+using SGC.AntonioAnte.Client.Services.Avaluos.Contracts;
+using SGC.AntonioAnte.Client.Services.Avaluos.Implementation;
 using SGC.AntonioAnte.Client.Services.Catastro.Contracts;
 using SGC.AntonioAnte.Client.Services.Catastro.Implementation;
 using SGC.AntonioAnte.Client.Services.Contracts;
@@ -33,6 +35,9 @@ builder.Services.AddScoped<IAuditoriaService, AuditoriaService>();
 builder.Services.AddScoped<ICatalogoService, CatalogoService>();
 builder.Services.AddScoped<IPropietarioService, PropietarioService>();
 builder.Services.AddScoped<IPredioService, PredioService>();
+
+// Registro de servicios del Módulo 4: Avalúos
+builder.Services.AddScoped<IAvaluosService, AvaluosService>();
 
 // 2. Registro del Interceptor
 builder.Services.AddTransient<IdentityHandler>();

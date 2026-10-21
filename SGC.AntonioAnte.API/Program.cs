@@ -5,13 +5,13 @@ using SGC.AntonioAnte.Application; // Asegúrate de importar el namespace donde 
 using SGC.AntonioAnte.Application.Common.Interfaces;
 using SGC.AntonioAnte.Infrastructure;
 using SGC.AntonioAnte.Infrastructure.Persistence;
-using SGC.AntonioAnte.Infrastructure.Persistence.Seeders;
+using SGC.AntonioAnte.Infrastructure.Persistence.Seeders; // <-- Importante: Asegura este namespace
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-
 builder.Services.AddControllers();
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 
@@ -37,7 +37,7 @@ builder.Services.AddSwaggerGen(c =>
         {
             new OpenApiSecurityScheme
             {
-                Reference = new OpenApiReference // <--- ESTO ES LO QUE FALTABA
+                Reference = new OpenApiReference
                 {
                     Type = ReferenceType.SecurityScheme,
                     Id = "Bearer"
@@ -48,17 +48,13 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-
 // Esto conecta tu DbContext e Identity configurados en Infrastructure
 builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddApplicationServices();
-
 builder.Services.AddHttpContextAccessor(); // Permite leer el contexto HTTP en cualquier lado
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>(); // Registra nuestro nuevo servicio
-
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
-
 
 builder.Services.AddCors(options =>
 {
@@ -74,7 +70,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // =========================================================================
-// EJECUCIÓN AUTOMÁTICA DE SEMILLA GEOESPACIAL (MÓDULO 3 - GIS)
+// EJECUCIÓN AUTOMÁTICA DE SEMILLAS Y MIGRACIONES
 // =========================================================================
 if (app.Environment.IsDevelopment())
 {
@@ -85,15 +81,21 @@ if (app.Environment.IsDevelopment())
     try
     {
         var context = services.GetRequiredService<ApplicationDbContext>();
+
+        // 1. Semilla Geoespacial (Módulo 3 - GIS)
         await CatastroSeeder.SeedAsync(context, logger);
+
+        // 2. 🔹 Semilla Financiera (Módulo 4 - Parámetros Económicos de Avalúos)
+        await AvaluosSeeder.SeedAsync(context);
+
+        logger.LogInformation("✅ Semillas de Catastro y Avalúos ejecutadas correctamente.");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Error crítico durante la inicialización del Seeder Catastral.");
+        logger.LogError(ex, "❌ Error crítico durante la inicialización de los Seeders.");
     }
 }
 // =========================================================================
-
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -102,21 +104,13 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-
 app.UseExceptionHandler();
-
-
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
-
 app.UseRouting();
-
-// AQUÍ AGREGAS LA LÍNEA:
 app.UseCors("PoliticaBlazorSGC");
-
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
