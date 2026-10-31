@@ -79,7 +79,9 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence.Configurations.Avaluos
             builder.Property(x => x.CemAplicada).HasPrecision(18, 2);
             builder.Property(x => x.EstadoLiquidacion).HasMaxLength(20);
 
-            // 🔹 Restricción FK al Aggregate Root
+            // 🔹 Nuevo: Configuración de la columna
+            builder.Property(x => x.MotivoAnulacion).HasMaxLength(500).IsRequired(false);
+
             builder.HasOne(x => x.Predio)
                    .WithMany()
                    .HasForeignKey(x => x.PredioId)

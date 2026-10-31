@@ -290,6 +290,10 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
                     b.Property<string>("ModificadoPor")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("MotivoAnulacion")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<Guid>("PredioId")
                         .HasColumnType("uniqueidentifier");
 

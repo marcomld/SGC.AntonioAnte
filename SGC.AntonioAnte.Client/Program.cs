@@ -38,6 +38,7 @@ builder.Services.AddScoped<IPredioService, PredioService>();
 
 // Registro de servicios del Módulo 4: Avalúos
 builder.Services.AddScoped<IAvaluosService, AvaluosService>();
+builder.Services.AddScoped<IAvaluosParametrosService, AvaluosParametrosService>();
 
 // 2. Registro del Interceptor
 builder.Services.AddTransient<IdentityHandler>();

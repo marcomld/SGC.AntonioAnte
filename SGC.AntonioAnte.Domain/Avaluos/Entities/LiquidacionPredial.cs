@@ -1,10 +1,6 @@
 ﻿using SGC.AntonioAnte.Domain.Catastro.Entities;
 using SGC.AntonioAnte.Domain.Common;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Domain.Avaluos.Entities
 {
@@ -21,6 +17,9 @@ namespace SGC.AntonioAnte.Domain.Avaluos.Entities
         public decimal ValorEmision { get; private set; }
         public decimal CemAplicada { get; private set; }
         public string EstadoLiquidacion { get; private set; } = string.Empty;
+
+        // 🔹 Nuevo: Rastro de auditoría para reliquidaciones
+        public string? MotivoAnulacion { get; private set; }
 
         private LiquidacionPredial() { }
 
@@ -44,6 +43,13 @@ namespace SGC.AntonioAnte.Domain.Avaluos.Entities
                 EstadoLiquidacion = estado,
                 EstadoActivo = true
             };
+        }
+
+        // 🔹 Nuevo: Comportamiento DDD para la baja tributaria
+        public void AnularOSustituir(string motivo)
+        {
+            EstadoLiquidacion = "Sustituido";
+            MotivoAnulacion = motivo;
         }
     }
 }
