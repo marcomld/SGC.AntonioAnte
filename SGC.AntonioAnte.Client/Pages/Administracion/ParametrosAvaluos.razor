@@ -1,0 +1,1291 @@
+﻿@page "/administracion/parametros-avaluos"
+@attribute [Authorize(Roles = "AdminSistemas,SuperAdmin,JefeCatastro")]
+
+@using System.Threading
+@using Microsoft.AspNetCore.Authorization
+@using SGC.AntonioAnte.Client.Services.Avaluos.Contracts
+@using SGC.AntonioAnte.Client.Services.Catastro.Contracts
+@using SGC.AntonioAnte.Domain.Catastro.Enums
+@using SGC.AntonioAnte.Shared.DTOs.Avaluos.CostosReposicion
+@using SGC.AntonioAnte.Shared.DTOs.Avaluos.FactoresAfectacion
+@using SGC.AntonioAnte.Shared.DTOs.Avaluos.FactoresDepreciacion
+@using SGC.AntonioAnte.Shared.DTOs.Avaluos.PreciosBaseSuelo
+@using SGC.AntonioAnte.Shared.DTOs.Catastro.Catalogos
+@using SGC.AntonioAnte.Shared.DTOs.Common
+
+@inject IAvaluosParametrosService ParametrosService
+@inject ICatalogoService CatalogoService
+
+<div class="container-fluid py-4 animate-fade-in">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+        <div>
+            <h1 class="h2 fw-bold text-dark mb-1"><i class="bi bi-cash-coin me-2 text-primary"></i>Parámetros Económicos</h1>
+            <p class="text-muted small mb-0">Gestión de catálogos y factores de valoración por Año Fiscal.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <div class="d-flex align-items-center gap-2 bg-white px-3 py-1 rounded-3 border shadow-sm me-2">
+                <label class="fw-bold text-muted small mb-0">AÑO FISCAL:</label>
+                <select class="form-select form-select-sm text-center fw-bold text-primary border-0 bg-transparent cursor-pointer shadow-none"
+                        style="width: 95px; font-size: 1.05rem;"
+                        @bind="anioFiscalGlobal"
+                        @bind:after="OnAnioFiscalCambiado">
+                    @for (int anio = DateTime.Now.Year + 2; anio >= 2010; anio--)
+                    {
+                        <option value="@anio">@anio</option>
+                    }
+                </select>
+            </div>
+            <button class="btn btn-outline-secondary d-flex align-items-center gap-2 px-3 py-2 fw-semibold shadow-sm" @onclick="CargarDatosTabActivo">
+                <i class="bi bi-arrow-clockwise"></i> Refrescar
+            </button>
+            <button class="btn btn-primary d-flex align-items-center gap-2 px-4 shadow-hover py-2 fw-semibold" @onclick="AbrirModalCrearSegunTab">
+                <i class="bi bi-plus-lg"></i> @TextoBotonNuevo
+            </button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(toastMensaje))
+    {
+        <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1090;">
+            <div class="toast show shadow-lg border-0 bg-white" role="alert">
+                <div class="toast-header @(toastEsExito ? "bg-success text-white" : "bg-danger text-white") border-0 py-2">
+                    <i class="bi @(toastEsExito ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-2 fs-6"></i>
+                    <strong class="me-auto">@(toastEsExito ? "Éxito" : "Atención")</strong>
+                    <button type="button" class="btn-close btn-close-white" @onclick="OcultarToast"></button>
+                </div>
+                <div class="toast-body fw-medium text-dark py-3">
+                    @toastMensaje
+                </div>
+            </div>
+        </div>
+    }
+
+    <ul class="nav nav-tabs px-2" role="tablist" style="border-bottom: 2px solid #2563eb;">
+        <li class="nav-item">
+            <button class="nav-link rounded-top-2 px-4 @(tabActivo == 1 ? "active text-white bg-primary fw-bold" : "text-dark bg-white border")" @onclick="() => CambiarTab(1)" style="@(tabActivo == 1 ? "border-color: #2563eb;" : "margin-bottom: -2px;")">
+                <i class="bi bi-bricks me-1"></i> Costos de Reposición
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-top-2 px-4 ms-1 @(tabActivo == 2 ? "active text-white bg-primary fw-bold" : "text-dark bg-white border")" @onclick="() => CambiarTab(2)" style="@(tabActivo == 2 ? "border-color: #2563eb;" : "margin-bottom: -2px;")">
+                <i class="bi bi-geo-alt-fill me-1"></i> Precios de Suelo
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-top-2 px-4 ms-1 @(tabActivo == 3 ? "active text-white bg-primary fw-bold" : "text-dark bg-white border")" @onclick="() => CambiarTab(3)" style="@(tabActivo == 3 ? "border-color: #2563eb;" : "margin-bottom: -2px;")">
+                <i class="bi bi-graph-down-arrow me-1"></i> Depreciación
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-top-2 px-4 ms-1 @(tabActivo == 4 ? "active text-white bg-primary fw-bold" : "text-dark bg-white border")" @onclick="() => CambiarTab(4)" style="@(tabActivo == 4 ? "border-color: #2563eb;" : "margin-bottom: -2px;")">
+                <i class="bi bi-sliders me-1"></i> Afectación
+            </button>
+        </li>
+    </ul>
+
+    <div class="card border-0 shadow-lg bg-white overflow-hidden rounded-bottom-4 rounded-end-4">
+        <div class="card-accent-bar" style="height: 4px; background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);"></div>
+        <div class="table-responsive">
+
+            <!-- ========================================== -->
+            <!-- TAB 1: COSTOS DE REPOSICIÓN                -->
+            <!-- ========================================== -->
+            @if (tabActivo == 1)
+            {
+                <table class="table table-hover align-middle mb-0 custom-table">
+                    <thead class="table-light text-uppercase font-monospace text-muted small" style="font-size: 0.75rem;">
+                        <tr>
+                            <th class="ps-4 py-3">Año Fiscal</th>
+                            <th class="py-3">Tipo de Estructura</th>
+                            <th class="py-3 text-end">Costo / m²</th>
+                            <th class="py-3 text-center">Estado</th>
+                            <th class="text-end pe-4 py-3">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (cargandoTab)
+                        {
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
+                                    <span class="text-muted fw-medium">Consultando registros en el servidor...</span>
+                                </td>
+                            </tr>
+                        }
+                        else if (costosReposicionPaginado == null || !costosReposicionPaginado.Items.Any())
+                        {
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">
+                                    <i class="bi bi-folder-symlink-fill display-6 d-block mb-2 opacity-50"></i>
+                                    <span class="small fw-semibold">No se encontraron costos de reposición para el año @anioFiscalGlobal.</span>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in costosReposicionPaginado.Items)
+                            {
+                                <tr class="@(item.EstadoActivo ? "" : "table-light opacity-75")">
+                                    <td class="ps-4 py-3 font-monospace fw-bold text-secondary">@item.AnioFiscal</td>
+                                    <td class="py-3 fw-bold text-dark">@item.TipoEstructuraNombre</td>
+                                    <td class="py-3 text-end font-monospace fw-bold text-primary fs-6">$@item.ValorMetroCuadrado.ToString("N2")</td>
+                                    <td class="py-3 text-center">
+                                        @if (item.EstadoActivo)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1">
+                                                <i class="bi bi-check-circle-fill me-1"></i> Activo
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5 py-1">
+                                                <i class="bi bi-x-circle-fill me-1"></i> Inactivo
+                                            </span>
+                                        }
+                                    </td>
+                                    <td class="text-end pe-4 py-3">
+                                        <div class="d-inline-flex gap-1">
+                                            <button class="btn btn-sm btn-outline-secondary rounded-2 btn-action" title="Editar" @onclick="() => AbrirModalEditarCosto(item)">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                            @if (item.EstadoActivo)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger rounded-2 btn-action" title="Desactivar" @onclick="() => SolicitarCambioEstado(item.Id, item.TipoEstructuraNombre, item.EstadoActivo)">
+                                                    <i class="bi bi-trash-fill"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-sm btn-outline-success rounded-2 btn-action" title="Activar" @onclick="() => SolicitarCambioEstado(item.Id, item.TipoEstructuraNombre, item.EstadoActivo)">
+                                                    <i class="bi bi-check-circle-fill"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <!-- ========================================== -->
+            <!-- TAB 2: PRECIOS BASE DE SUELO               -->
+            <!-- ========================================== -->
+            @if (tabActivo == 2)
+            {
+                <table class="table table-hover align-middle mb-0 custom-table">
+                    <thead class="table-light text-uppercase font-monospace text-muted small" style="font-size: 0.75rem;">
+                        <tr>
+                            <th class="ps-4 py-3">Año Fiscal</th>
+                            <th class="py-3">Clasificación</th>
+                            <th class="py-3 text-center">Zona</th>
+                            <th class="py-3 text-center">Sector</th>
+                            <th class="py-3 text-center">Manzana / Polígono</th>
+                            <th class="py-3 text-end">Valor / m²</th>
+                            <th class="py-3 text-center">Estado</th>
+                            <th class="text-end pe-4 py-3">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (cargandoTab)
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5">
+                                    <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
+                                    <span class="text-muted fw-medium">Consultando registros en el servidor...</span>
+                                </td>
+                            </tr>
+                        }
+                        else if (preciosSueloPaginado == null || !preciosSueloPaginado.Items.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="text-center py-5 text-muted">
+                                    <i class="bi bi-folder-symlink-fill display-6 d-block mb-2 opacity-50"></i>
+                                    <span class="small fw-semibold">No se encontraron precios base de suelo para el año @anioFiscalGlobal.</span>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in preciosSueloPaginado.Items)
+                            {
+                                <tr class="@(item.EstadoActivo ? "" : "table-light opacity-75")">
+                                    <td class="ps-4 py-3 font-monospace fw-bold text-secondary">@item.AnioFiscal</td>
+                                    <td class="py-3">
+                                        <span class="badge @(item.TipoPredio == TipoPredio.Urbano ? "bg-primary-subtle text-primary border-primary-subtle" : "bg-success-subtle text-success border-success-subtle") border font-monospace">
+                                            @item.TipoPredio.ToString().ToUpper()
+                                        </span>
+                                    </td>
+                                    <td class="py-3 text-center font-monospace fw-bold text-dark">@item.Zona</td>
+                                    <td class="py-3 text-center font-monospace fw-bold text-dark">@item.Sector</td>
+                                    <td class="py-3 text-center font-monospace text-muted">@(string.IsNullOrWhiteSpace(item.ManzanaPoligono) ? "TODOS" : item.ManzanaPoligono)</td>
+                                    <td class="py-3 text-end font-monospace fw-bold text-primary fs-6">$@item.ValorMetroCuadrado.ToString("N2")</td>
+                                    <td class="py-3 text-center">
+                                        @if (item.EstadoActivo)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1">
+                                                <i class="bi bi-check-circle-fill me-1"></i> Activo
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5 py-1">
+                                                <i class="bi bi-x-circle-fill me-1"></i> Inactivo
+                                            </span>
+                                        }
+                                    </td>
+                                    <td class="text-end pe-4 py-3">
+                                        <div class="d-inline-flex gap-1">
+                                            <button class="btn btn-sm btn-outline-secondary rounded-2 btn-action" title="Editar" @onclick="() => AbrirModalEditarPrecioSuelo(item)">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                            @if (item.EstadoActivo)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger rounded-2 btn-action" title="Desactivar" @onclick='() => SolicitarCambioEstado(item.Id, $"Zona {item.Zona} - Sector {item.Sector}", item.EstadoActivo)'>
+                                                    <i class="bi bi-trash-fill"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-sm btn-outline-success rounded-2 btn-action" title="Activar" @onclick='() => SolicitarCambioEstado(item.Id, $"Zona {item.Zona} - Sector {item.Sector}", item.EstadoActivo)'>
+                                                    <i class="bi bi-check-circle-fill"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <!-- ========================================== -->
+            <!-- TAB 3: FACTORES DE DEPRECIACIÓN            -->
+            <!-- ========================================== -->
+            @if (tabActivo == 3)
+            {
+                <table class="table table-hover align-middle mb-0 custom-table">
+                    <thead class="table-light text-uppercase font-monospace text-muted small" style="font-size: 0.75rem;">
+                        <tr>
+                            <th class="ps-4 py-3">Año Fiscal</th>
+                            <th class="py-3">Estado de Conservación</th>
+                            <th class="py-3 text-center">Rango de Edad (Años)</th>
+                            <th class="py-3 text-end">Coeficiente</th>
+                            <th class="py-3 text-center">Castigo Aplicado</th>
+                            <th class="py-3 text-center">Estado</th>
+                            <th class="text-end pe-4 py-3">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (cargandoTab)
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-5">
+                                    <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
+                                    <span class="text-muted fw-medium">Consultando registros en el servidor...</span>
+                                </td>
+                            </tr>
+                        }
+                        else if (factoresDepreciacionPaginado == null || !factoresDepreciacionPaginado.Items.Any())
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center py-5 text-muted">
+                                    <i class="bi bi-folder-symlink-fill display-6 d-block mb-2 opacity-50"></i>
+                                    <span class="small fw-semibold">No se encontraron factores de depreciación para el año @anioFiscalGlobal.</span>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in factoresDepreciacionPaginado.Items)
+                            {
+                                <tr class="@(item.EstadoActivo ? "" : "table-light opacity-75")">
+                                    <td class="ps-4 py-3 font-monospace fw-bold text-secondary">@item.AnioFiscal</td>
+                                    <td class="py-3 fw-bold text-dark">
+                                        <span class="badge badge-dep text-dark">@item.EstadoConservacionNombre</span>
+                                    </td>
+                                    <td class="py-3 text-center font-monospace fw-semibold text-dark">@item.EdadMinima a @item.EdadMaxima años</td>
+                                    <td class="py-3 text-end font-monospace fw-bold text-primary fs-6">@item.Coeficiente.ToString("N4")</td>
+                                    <td class="py-3 text-center font-monospace fw-semibold text-danger">-@((1m - item.Coeficiente).ToString("P1"))</td>
+                                    <td class="py-3 text-center">
+                                        @if (item.EstadoActivo)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1">
+                                                <i class="bi bi-check-circle-fill me-1"></i> Activo
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5 py-1">
+                                                <i class="bi bi-x-circle-fill me-1"></i> Inactivo
+                                            </span>
+                                        }
+                                    </td>
+                                    <td class="text-end pe-4 py-3">
+                                        <div class="d-inline-flex gap-1">
+                                            <button class="btn btn-sm btn-outline-secondary rounded-2 btn-action" title="Editar" @onclick="() => AbrirModalEditarDepreciacion(item)">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                            @if (item.EstadoActivo)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger rounded-2 btn-action" title="Desactivar" @onclick='() => SolicitarCambioEstado(item.Id, $"{item.EstadoConservacionNombre} ({item.EdadMinima}-{item.EdadMaxima} años)", item.EstadoActivo)'>
+                                                    <i class="bi bi-trash-fill"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-sm btn-outline-success rounded-2 btn-action" title="Activar" @onclick='() => SolicitarCambioEstado(item.Id, $"{item.EstadoConservacionNombre} ({item.EdadMinima}-{item.EdadMaxima} años)", item.EstadoActivo)'>
+                                                    <i class="bi bi-check-circle-fill"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            }
+
+            <!-- ========================================== -->
+            <!-- TAB 4: FACTORES DE AFECTACIÓN              -->
+            <!-- ========================================== -->
+            @if (tabActivo == 4)
+            {
+                <table class="table table-hover align-middle mb-0 custom-table">
+                    <thead class="table-light text-uppercase font-monospace text-muted small" style="font-size: 0.75rem;">
+                        <tr>
+                            <th class="ps-4 py-3">Año Fiscal</th>
+                            <th class="py-3">Tipo de Afectación Terreno</th>
+                            <th class="py-3 text-end">Coeficiente</th>
+                            <th class="py-3 text-center">Estado</th>
+                            <th class="text-end pe-4 py-3">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (cargandoTab)
+                        {
+                            <tr>
+                                <td colspan="5" class="text-center py-5">
+                                    <div class="spinner-border text-primary spinner-border-sm me-2" role="status"></div>
+                                    <span class="text-muted fw-medium">Consultando registros en el servidor...</span>
+                                </td>
+                            </tr>
+                        }
+                        else if (factoresAfectacionPaginado == null || !factoresAfectacionPaginado.Items.Any())
+                        {
+                            <tr>
+                                <td colspan="5" class="text-center py-5 text-muted">
+                                    <i class="bi bi-folder-symlink-fill display-6 d-block mb-2 opacity-50"></i>
+                                    <span class="small fw-semibold">No se encontraron factores de afectación para el año @anioFiscalGlobal.</span>
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in factoresAfectacionPaginado.Items)
+                            {
+                                <tr class="@(item.EstadoActivo ? "" : "table-light opacity-75")">
+                                    <td class="ps-4 py-3 font-monospace fw-bold text-secondary">@item.AnioFiscal</td>
+                                    <td class="py-3 fw-bold text-dark">@item.TipoAfectacion</td>
+                                    <td class="py-3 text-end font-monospace fw-bold text-primary fs-6">@item.Coeficiente.ToString("N4")</td>
+                                    <td class="py-3 text-center">
+                                        @if (item.EstadoActivo)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1">
+                                                <i class="bi bi-check-circle-fill me-1"></i> Activo
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill px-2.5 py-1">
+                                                <i class="bi bi-x-circle-fill me-1"></i> Inactivo
+                                            </span>
+                                        }
+                                    </td>
+                                    <td class="text-end pe-4 py-3">
+                                        <div class="d-inline-flex gap-1">
+                                            <button class="btn btn-sm btn-outline-secondary rounded-2 btn-action" title="Editar" @onclick="() => AbrirModalEditarAfectacion(item)">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+                                            @if (item.EstadoActivo)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger rounded-2 btn-action" title="Desactivar" @onclick="() => SolicitarCambioEstado(item.Id, item.TipoAfectacion, item.EstadoActivo)">
+                                                    <i class="bi bi-trash-fill"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-sm btn-outline-success rounded-2 btn-action" title="Activar" @onclick="() => SolicitarCambioEstado(item.Id, item.TipoAfectacion, item.EstadoActivo)">
+                                                    <i class="bi bi-check-circle-fill"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+
+        <!-- PAGINADOR TRANSVERSAL -->
+        @if (!cargandoTab && TotalRegistrosActual > 0)
+        {
+            <div class="card-footer bg-white border-top py-3 px-4 d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+                <div class="small text-muted">
+                    Mostrando <strong>@(((paginaActual - 1) * registrosPorPagina) + 1)</strong> a
+                    <strong>@(Math.Min(paginaActual * registrosPorPagina, TotalRegistrosActual))</strong> de
+                    <strong>@TotalRegistrosActual</strong> parámetros
+                </div>
+
+                <div class="d-flex align-items-center gap-3">
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item @(paginaActual > 1 ? "" : "disabled")">
+                                <button class="page-item-btn" @onclick="() => CambiarPagina(paginaActual - 1)" title="Anterior"><i class="bi bi-chevron-left"></i></button>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-item-text">Página @paginaActual de @TotalPaginasCalculadas</span>
+                            </li>
+                            <li class="page-item @(paginaActual < TotalPaginasCalculadas ? "" : "disabled")">
+                                <button class="page-item-btn" @onclick="() => CambiarPagina(paginaActual + 1)" title="Siguiente"><i class="bi bi-chevron-right"></i></button>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL 1: COSTOS DE REPOSICIÓN              -->
+<!-- ========================================== -->
+@if (mostrarModalFormulario && tabActivo == 1)
+{
+    <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1070;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-4">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi @(registroEnEdicionId.HasValue ? "bi-pencil-square" : "bi-plus-circle-fill") me-2 text-primary"></i>
+                        @(registroEnEdicionId.HasValue ? "Editar Costo de Reposición" : "Registrar Costo de Reposición")
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CerrarModalFormulario"></button>
+                </div>
+                <div class="modal-body p-4">
+                    @if (!string.IsNullOrEmpty(modalErrorMensaje))
+                    {
+                        <div class="alert alert-danger border-0 shadow-sm small mb-3 rounded-3" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> @modalErrorMensaje
+                        </div>
+                    }
+
+                    <EditForm Model="@modeloCosto" OnValidSubmit="GuardarCostoReposicion">
+                        <DataAnnotationsValidator />
+
+                        <div class="form-floating mb-3">
+                            <InputNumber id="txtAnioCosto" class="form-control fw-bold font-monospace" @bind-Value="modeloCosto.AnioFiscal" disabled="@(registroEnEdicionId.HasValue || procesandoFormulario)" />
+                            <label for="txtAnioCosto">Año Fiscal</label>
+                            <ValidationMessage For="@(() => modeloCosto.AnioFiscal)" class="text-danger small mt-1" />
+                        </div>
+
+                        <div class="form-floating mb-3">
+                            <InputSelect id="ddlEstructura" class="form-select" @bind-Value="modeloCosto.TipoEstructuraId" disabled="@procesandoFormulario">
+                                <option value="@Guid.Empty">-- Seleccionar --</option>
+                                @foreach (var cat in tiposEstructuraCatalogo)
+                                {
+                                    <option value="@cat.Id">@cat.Nombre</option>
+                                }
+                            </InputSelect>
+                            <label for="ddlEstructura">Tipo de Estructura Constructiva</label>
+                            <ValidationMessage For="@(() => modeloCosto.TipoEstructuraId)" class="text-danger small mt-1" />
+                        </div>
+
+                        <div class="form-floating mb-4">
+                            <InputNumber step="0.01" id="txtValorMetroCosto" class="form-control font-monospace fw-bold" @bind-Value="modeloCosto.ValorMetroCuadrado" placeholder="0.00" disabled="@procesandoFormulario" />
+                            <label for="txtValorMetroCosto">Valor por m² (USD)</label>
+                            <ValidationMessage For="@(() => modeloCosto.ValorMetroCuadrado)" class="text-danger small mt-1" />
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-light fw-semibold text-muted px-4" @onclick="CerrarModalFormulario" disabled="@procesandoFormulario">Cancelar</button>
+                            <button type="submit" class="btn btn-primary fw-semibold shadow-sm px-4" disabled="@procesandoFormulario">
+                                @if (procesandoFormulario)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span> <span>Guardando...</span>
+                                }
+                                else
+                                {
+                                    <span>@(registroEnEdicionId.HasValue ? "Guardar Cambios" : "Guardar Parámetro")</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ========================================== -->
+<!-- MODAL 2: PRECIOS BASE DE SUELO             -->
+<!-- ========================================== -->
+@if (mostrarModalFormulario && tabActivo == 2)
+{
+    <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1070;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-4">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi @(registroEnEdicionId.HasValue ? "bi-pencil-square" : "bi-plus-circle-fill") me-2 text-primary"></i>
+                        @(registroEnEdicionId.HasValue ? "Editar Precio Base de Suelo" : "Registrar Precio Base de Suelo")
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CerrarModalFormulario"></button>
+                </div>
+                <div class="modal-body p-4">
+                    @if (!string.IsNullOrEmpty(modalErrorMensaje))
+                    {
+                        <div class="alert alert-danger border-0 shadow-sm small mb-3 rounded-3" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> @modalErrorMensaje
+                        </div>
+                    }
+
+                    <EditForm Model="@modeloPrecioSuelo" OnValidSubmit="GuardarPrecioSuelo">
+                        <DataAnnotationsValidator />
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <InputNumber id="txtAnioSuelo" class="form-control fw-bold font-monospace" @bind-Value="modeloPrecioSuelo.AnioFiscal" disabled="@(registroEnEdicionId.HasValue || procesandoFormulario)" />
+                                    <label for="txtAnioSuelo">Año Fiscal</label>
+                                    <ValidationMessage For="@(() => modeloPrecioSuelo.AnioFiscal)" class="text-danger small mt-1" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <InputSelect id="ddlTipoPredioSuelo" class="form-select fw-bold" @bind-Value="modeloPrecioSuelo.TipoPredio" disabled="@procesandoFormulario">
+                                        <option value="@TipoPredio.Urbano">URBANO</option>
+                                        <option value="@TipoPredio.Rural">RURAL</option>
+                                    </InputSelect>
+                                    <label for="ddlTipoPredioSuelo">Tipo de Predio</label>
+                                    <ValidationMessage For="@(() => modeloPrecioSuelo.TipoPredio)" class="text-danger small mt-1" />
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-floating">
+                                    <InputText id="txtZonaSuelo" class="form-control font-monospace" @bind-Value="modeloPrecioSuelo.Zona" placeholder="01" maxlength="10" disabled="@procesandoFormulario" />
+                                    <label for="txtZonaSuelo">Zona (Ej: 01)</label>
+                                    <ValidationMessage For="@(() => modeloPrecioSuelo.Zona)" class="text-danger small mt-1" />
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-floating">
+                                    <InputText id="txtSectorSuelo" class="form-control font-monospace" @bind-Value="modeloPrecioSuelo.Sector" placeholder="01" maxlength="10" disabled="@procesandoFormulario" />
+                                    <label for="txtSectorSuelo">Sector (Ej: 01)</label>
+                                    <ValidationMessage For="@(() => modeloPrecioSuelo.Sector)" class="text-danger small mt-1" />
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-floating">
+                                    <InputText id="txtManzanaSuelo" class="form-control font-monospace" @bind-Value="modeloPrecioSuelo.ManzanaPoligono" placeholder="001" maxlength="20" disabled="@procesandoFormulario" />
+                                    <label for="txtManzanaSuelo">Manzana / Pol.</label>
+                                    <ValidationMessage For="@(() => modeloPrecioSuelo.ManzanaPoligono)" class="text-danger small mt-1" />
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    <InputNumber step="0.01" id="txtValorSuelo" class="form-control font-monospace fw-bold" @bind-Value="modeloPrecioSuelo.ValorMetroCuadrado" placeholder="0.00" disabled="@procesandoFormulario" />
+                                    <label for="txtValorSuelo">Valor Base por m² (USD)</label>
+                                    <ValidationMessage For="@(() => modeloPrecioSuelo.ValorMetroCuadrado)" class="text-danger small mt-1" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-light fw-semibold text-muted px-4" @onclick="CerrarModalFormulario" disabled="@procesandoFormulario">Cancelar</button>
+                            <button type="submit" class="btn btn-primary fw-semibold shadow-sm px-4" disabled="@procesandoFormulario">
+                                @if (procesandoFormulario)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span> <span>Guardando...</span>
+                                }
+                                else
+                                {
+                                    <span>@(registroEnEdicionId.HasValue ? "Guardar Cambios" : "Guardar Precio")</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ========================================== -->
+<!-- MODAL 3: FACTORES DE DEPRECIACIÓN          -->
+<!-- ========================================== -->
+@if (mostrarModalFormulario && tabActivo == 3)
+{
+    <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1070;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-4">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi @(registroEnEdicionId.HasValue ? "bi-pencil-square" : "bi-plus-circle-fill") me-2 text-primary"></i>
+                        @(registroEnEdicionId.HasValue ? "Editar Factor de Depreciación" : "Registrar Factor de Depreciación")
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CerrarModalFormulario"></button>
+                </div>
+                <div class="modal-body p-4">
+                    @if (!string.IsNullOrEmpty(modalErrorMensaje))
+                    {
+                        <div class="alert alert-danger border-0 shadow-sm small mb-3 rounded-3" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> @modalErrorMensaje
+                        </div>
+                    }
+
+                    <EditForm Model="@modeloDepreciacion" OnValidSubmit="GuardarFactorDepreciacion">
+                        <DataAnnotationsValidator />
+
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    <InputNumber id="txtAnioDep" class="form-control fw-bold font-monospace" @bind-Value="modeloDepreciacion.AnioFiscal" disabled="@(registroEnEdicionId.HasValue || procesandoFormulario)" />
+                                    <label for="txtAnioDep">Año Fiscal</label>
+                                    <ValidationMessage For="@(() => modeloDepreciacion.AnioFiscal)" class="text-danger small mt-1" />
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    <InputSelect id="ddlConservacionDep" class="form-select" @bind-Value="modeloDepreciacion.EstadoConservacionId" disabled="@procesandoFormulario">
+                                        <option value="@Guid.Empty">-- Seleccionar Estado --</option>
+                                        @foreach (var cons in estadosConservacionCatalogo)
+                                        {
+                                            <option value="@cons.Id">@cons.Nombre</option>
+                                        }
+                                    </InputSelect>
+                                    <label for="ddlConservacionDep">Estado de Conservación</label>
+                                    <ValidationMessage For="@(() => modeloDepreciacion.EstadoConservacionId)" class="text-danger small mt-1" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <InputNumber id="txtEdadMin" class="form-control font-monospace" @bind-Value="modeloDepreciacion.EdadMinima" disabled="@procesandoFormulario" />
+                                    <label for="txtEdadMin">Edad Mínima (Años)</label>
+                                    <ValidationMessage For="@(() => modeloDepreciacion.EdadMinima)" class="text-danger small mt-1" />
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <InputNumber id="txtEdadMax" class="form-control font-monospace" @bind-Value="modeloDepreciacion.EdadMaxima" disabled="@procesandoFormulario" />
+                                    <label for="txtEdadMax">Edad Máxima (Años)</label>
+                                    <ValidationMessage For="@(() => modeloDepreciacion.EdadMaxima)" class="text-danger small mt-1" />
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    <InputNumber step="0.0001" id="txtCoefDep" class="form-control font-monospace fw-bold" @bind-Value="modeloDepreciacion.Coeficiente" placeholder="0.9500" disabled="@procesandoFormulario" />
+                                    <label for="txtCoefDep">Coeficiente (0.0001 a 1.0000)</label>
+                                    <ValidationMessage For="@(() => modeloDepreciacion.Coeficiente)" class="text-danger small mt-1" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-light fw-semibold text-muted px-4" @onclick="CerrarModalFormulario" disabled="@procesandoFormulario">Cancelar</button>
+                            <button type="submit" class="btn btn-primary fw-semibold shadow-sm px-4" disabled="@procesandoFormulario">
+                                @if (procesandoFormulario)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span> <span>Guardando...</span>
+                                }
+                                else
+                                {
+                                    <span>@(registroEnEdicionId.HasValue ? "Guardar Cambios" : "Guardar Factor")</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ========================================== -->
+<!-- MODAL 4: FACTORES DE AFECTACIÓN            -->
+<!-- ========================================== -->
+@if (mostrarModalFormulario && tabActivo == 4)
+{
+    <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1070;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0 rounded-4">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h5 class="modal-title fw-bold text-dark">
+                        <i class="bi @(registroEnEdicionId.HasValue ? "bi-pencil-square" : "bi-plus-circle-fill") me-2 text-primary"></i>
+                        @(registroEnEdicionId.HasValue ? "Editar Factor de Afectación" : "Registrar Factor de Afectación")
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CerrarModalFormulario"></button>
+                </div>
+                <div class="modal-body p-4">
+                    @if (!string.IsNullOrEmpty(modalErrorMensaje))
+                    {
+                        <div class="alert alert-danger border-0 shadow-sm small mb-3 rounded-3" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> @modalErrorMensaje
+                        </div>
+                    }
+
+                    <EditForm Model="@modeloAfectacion" OnValidSubmit="GuardarFactorAfectacion">
+                        <DataAnnotationsValidator />
+
+                        <div class="form-floating mb-3">
+                            <InputNumber id="txtAnioAfec" class="form-control fw-bold font-monospace" @bind-Value="modeloAfectacion.AnioFiscal" disabled="@(registroEnEdicionId.HasValue || procesandoFormulario)" />
+                            <label for="txtAnioAfec">Año Fiscal</label>
+                            <ValidationMessage For="@(() => modeloAfectacion.AnioFiscal)" class="text-danger small mt-1" />
+                        </div>
+
+                        <div class="form-floating mb-3">
+                            <InputText id="txtTipoAfec" class="form-control" @bind-Value="modeloAfectacion.TipoAfectacion" placeholder="Ej: Pendiente Fuerte" maxlength="100" disabled="@procesandoFormulario" />
+                            <label for="txtTipoAfec">Tipo / Concepto de Afectación</label>
+                            <ValidationMessage For="@(() => modeloAfectacion.TipoAfectacion)" class="text-danger small mt-1" />
+                        </div>
+
+                        <div class="form-floating mb-4">
+                            <InputNumber step="0.0001" id="txtCoefAfec" class="form-control font-monospace fw-bold" @bind-Value="modeloAfectacion.Coeficiente" placeholder="0.8500" disabled="@procesandoFormulario" />
+                            <label for="txtCoefAfec">Coeficiente (0.0001 a 2.0000)</label>
+                            <ValidationMessage For="@(() => modeloAfectacion.Coeficiente)" class="text-danger small mt-1" />
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <button type="button" class="btn btn-light fw-semibold text-muted px-4" @onclick="CerrarModalFormulario" disabled="@procesandoFormulario">Cancelar</button>
+                            <button type="submit" class="btn btn-primary fw-semibold shadow-sm px-4" disabled="@procesandoFormulario">
+                                @if (procesandoFormulario)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span> <span>Guardando...</span>
+                                }
+                                else
+                                {
+                                    <span>@(registroEnEdicionId.HasValue ? "Guardar Cambios" : "Guardar Factor")</span>
+                                }
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- ========================================== -->
+<!-- MODAL UNIFICADO DE CAMBIO DE ESTADO        -->
+<!-- ========================================== -->
+@if (idEstadoCambiar.HasValue)
+{
+    <div class="modal fade show d-block backdrop-blur" tabindex="-1" style="z-index: 1080;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content shadow-lg rounded-4 border-0">
+                <div class="modal-body text-center p-4">
+                    <div class="mb-3">
+                        @if (estadoActualCambiar)
+                        {
+                            <div class="rounded-circle bg-danger-subtle text-danger d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                <i class="bi bi-trash-fill fs-2"></i>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="rounded-circle bg-success-subtle text-success d-inline-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                                <i class="bi bi-check-circle-fill fs-2"></i>
+                            </div>
+                        }
+                    </div>
+                    <h5 class="fw-bold text-dark mb-1">¿Estás seguro?</h5>
+                    <p class="text-muted small mb-0">
+                        @(estadoActualCambiar
+                            ? $"Vas a desactivar el parámetro '{nombreEstadoCambiar}'."
+                            : $"Vas a restaurar el parámetro '{nombreEstadoCambiar}'.")
+                    </p>
+
+                    <div class="d-flex justify-content-center gap-3 mt-4">
+                        <button class="btn btn-light fw-semibold text-muted px-4" @onclick="() => idEstadoCambiar = null">Cancelar</button>
+                        <button class="btn @(estadoActualCambiar ? "btn-danger" : "btn-success") fw-semibold shadow-sm px-4" @onclick="ConfirmarCambioEstado">
+                            Sí, @(estadoActualCambiar ? "Desactivar" : "Activar")
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .backdrop-blur {
+        background-color: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(4px);
+    }
+
+    .custom-table tbody tr {
+        transition: background-color 0.15s ease;
+    }
+
+        .custom-table tbody tr:hover {
+            background-color: #f8fafc;
+        }
+
+    .badge-dep {
+        background-color: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        font-weight: 500;
+        font-size: 0.8rem;
+        padding: 0.35rem 0.6rem;
+        border-radius: 0.5rem;
+    }
+
+    .btn-action {
+        font-size: 0.825rem;
+        font-weight: 600;
+        padding: 0.35rem 0.65rem;
+    }
+
+    .shadow-hover {
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+        .shadow-hover:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.25);
+        }
+
+    .cursor-pointer {
+        cursor: pointer;
+    }
+
+    .page-item-btn {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        color: #475569;
+        padding: 0.35rem 0.65rem;
+        font-size: 0.85rem;
+        border-radius: 0.375rem;
+        transition: all 0.15s ease;
+    }
+
+        .page-item-btn:hover:not(:disabled) {
+            background-color: #f1f5f9;
+            color: #2563eb;
+        }
+
+    .page-item-text {
+        padding: 0.35rem 0.75rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #334155;
+    }
+
+    .page-item.disabled .page-item-btn {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .animate-fade-in {
+        animation: fadeIn 0.25s ease-out;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(5px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+
+@code {
+    private int anioFiscalGlobal = DateTime.Now.Year;
+    private int tabActivo = 1;
+    private bool cargandoTab = true;
+    private int paginaActual = 1;
+    private int registrosPorPagina = 10;
+
+    private string toastMensaje = string.Empty;
+    private bool toastEsExito = true;
+    private CancellationTokenSource? toastCts;
+
+    // Listas Paginadas de las 4 Pestañas
+    private ResultadoPaginadoDto<CostoReposicionDto>? costosReposicionPaginado;
+    private ResultadoPaginadoDto<PrecioBaseSueloDto>? preciosSueloPaginado;
+    private ResultadoPaginadoDto<FactorDepreciacionDto>? factoresDepreciacionPaginado;
+    private ResultadoPaginadoDto<FactorAfectacionDto>? factoresAfectacionPaginado;
+
+    // Catálogos Base
+    private List<CatalogoDto> tiposEstructuraCatalogo = new();
+    private List<CatalogoDto> estadosConservacionCatalogo = new();
+
+    // Estado de Modales de Formulario
+    private bool mostrarModalFormulario = false;
+    private bool procesandoFormulario = false;
+    private string modalErrorMensaje = string.Empty;
+    private Guid? registroEnEdicionId = null;
+
+    // Modelos de Formulario
+    private UpdateCostoReposicionDto modeloCosto = new();
+    private UpdatePrecioBaseSueloDto modeloPrecioSuelo = new();
+    private UpdateFactorDepreciacionDto modeloDepreciacion = new();
+    private UpdateFactorAfectacionDto modeloAfectacion = new();
+
+    // Estado Modal Confirmación Activar/Desactivar
+    private Guid? idEstadoCambiar = null;
+    private string nombreEstadoCambiar = string.Empty;
+    private bool estadoActualCambiar = false;
+
+    private string TextoBotonNuevo => tabActivo switch
+    {
+        1 => "Nuevo Costo",
+        2 => "Nuevo Precio Suelo",
+        3 => "Nuevo Factor Dep.",
+        4 => "Nuevo Factor Afec.",
+        _ => "Nuevo Parámetro"
+    };
+
+    private int TotalRegistrosActual => tabActivo switch
+    {
+        1 => costosReposicionPaginado?.TotalRegistros ?? 0,
+        2 => preciosSueloPaginado?.TotalRegistros ?? 0,
+        3 => factoresDepreciacionPaginado?.TotalRegistros ?? 0,
+        4 => factoresAfectacionPaginado?.TotalRegistros ?? 0,
+        _ => 0
+    };
+
+    private int TotalPaginasCalculadas
+    {
+        get
+        {
+            if (TotalRegistrosActual == 0) return 1;
+            int paginasServidor = tabActivo switch
+            {
+                1 => costosReposicionPaginado?.TotalPaginas ?? 0,
+                2 => preciosSueloPaginado?.TotalPaginas ?? 0,
+                3 => factoresDepreciacionPaginado?.TotalPaginas ?? 0,
+                4 => factoresAfectacionPaginado?.TotalPaginas ?? 0,
+                _ => 0
+            };
+            return paginasServidor > 0 ? paginasServidor : (int)Math.Ceiling((double)TotalRegistrosActual / registrosPorPagina);
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var taskEstructuras = CatalogoService.ObtenerTiposEstructuraAsync();
+        var taskConservacion = CatalogoService.ObtenerEstadosConservacionAsync();
+        await Task.WhenAll(taskEstructuras, taskConservacion);
+
+        tiposEstructuraCatalogo = await taskEstructuras;
+        estadosConservacionCatalogo = await taskConservacion;
+
+        await CargarDatosTabActivo();
+    }
+
+    private async Task CambiarTab(int tab)
+    {
+        tabActivo = tab;
+        paginaActual = 1;
+        CerrarModalFormulario();
+        await CargarDatosTabActivo();
+    }
+
+    private async Task OnAnioFiscalCambiado()
+    {
+        paginaActual = 1;
+        await CargarDatosTabActivo();
+    }
+
+    private async Task CambiarPagina(int nuevaPagina)
+    {
+        if (nuevaPagina < 1 || nuevaPagina > TotalPaginasCalculadas) return;
+        paginaActual = nuevaPagina;
+        await CargarDatosTabActivo();
+    }
+
+    private async Task CargarDatosTabActivo()
+    {
+        cargandoTab = true;
+
+        switch (tabActivo)
+        {
+            case 1:
+                costosReposicionPaginado = await ParametrosService.ObtenerCostosReposicionPaginadoAsync(anioFiscalGlobal, paginaActual, registrosPorPagina);
+                break;
+            case 2:
+                preciosSueloPaginado = await ParametrosService.ObtenerPreciosSueloPaginadoAsync(anioFiscalGlobal, paginaActual, registrosPorPagina);
+                break;
+            case 3:
+                factoresDepreciacionPaginado = await ParametrosService.ObtenerFactoresDepreciacionPaginadoAsync(anioFiscalGlobal, paginaActual, registrosPorPagina);
+                break;
+            case 4:
+                factoresAfectacionPaginado = await ParametrosService.ObtenerFactoresAfectacionPaginadoAsync(anioFiscalGlobal, paginaActual, registrosPorPagina);
+                break;
+        }
+
+        cargandoTab = false;
+    }
+
+    // ==========================================
+    // APERTURA DE MODALES (CREAR / EDITAR)
+    // ==========================================
+    private void AbrirModalCrearSegunTab()
+    {
+        registroEnEdicionId = null;
+        modalErrorMensaje = string.Empty;
+
+        switch (tabActivo)
+        {
+            case 1:
+                modeloCosto = new UpdateCostoReposicionDto { AnioFiscal = anioFiscalGlobal, TipoEstructuraId = Guid.Empty, ValorMetroCuadrado = 0.00m };
+                break;
+            case 2:
+                modeloPrecioSuelo = new UpdatePrecioBaseSueloDto { AnioFiscal = anioFiscalGlobal, TipoPredio = TipoPredio.Urbano, Zona = "01", Sector = "01", ManzanaPoligono = "001", ValorMetroCuadrado = 0.00m };
+                break;
+            case 3:
+                modeloDepreciacion = new UpdateFactorDepreciacionDto { AnioFiscal = anioFiscalGlobal, EstadoConservacionId = Guid.Empty, EdadMinima = 0, EdadMaxima = 10, Coeficiente = 1.0000m };
+                break;
+            case 4:
+                modeloAfectacion = new UpdateFactorAfectacionDto { AnioFiscal = anioFiscalGlobal, TipoAfectacion = string.Empty, Coeficiente = 1.0000m };
+                break;
+        }
+
+        mostrarModalFormulario = true;
+    }
+
+    private void AbrirModalEditarCosto(CostoReposicionDto item)
+    {
+        registroEnEdicionId = item.Id;
+        modalErrorMensaje = string.Empty;
+        modeloCosto = new UpdateCostoReposicionDto
+        {
+            Id = item.Id,
+            AnioFiscal = item.AnioFiscal,
+            TipoEstructuraId = item.TipoEstructuraId,
+            ValorMetroCuadrado = item.ValorMetroCuadrado
+        };
+        mostrarModalFormulario = true;
+    }
+
+    private void AbrirModalEditarPrecioSuelo(PrecioBaseSueloDto item)
+    {
+        registroEnEdicionId = item.Id;
+        modalErrorMensaje = string.Empty;
+        modeloPrecioSuelo = new UpdatePrecioBaseSueloDto
+        {
+            Id = item.Id,
+            AnioFiscal = item.AnioFiscal,
+            TipoPredio = item.TipoPredio,
+            Zona = item.Zona,
+            Sector = item.Sector,
+            ManzanaPoligono = item.ManzanaPoligono,
+            ValorMetroCuadrado = item.ValorMetroCuadrado
+        };
+        mostrarModalFormulario = true;
+    }
+
+    private void AbrirModalEditarDepreciacion(FactorDepreciacionDto item)
+    {
+        registroEnEdicionId = item.Id;
+        modalErrorMensaje = string.Empty;
+        modeloDepreciacion = new UpdateFactorDepreciacionDto
+        {
+            Id = item.Id,
+            AnioFiscal = item.AnioFiscal,
+            EstadoConservacionId = item.EstadoConservacionId,
+            EdadMinima = item.EdadMinima,
+            EdadMaxima = item.EdadMaxima,
+            Coeficiente = item.Coeficiente
+        };
+        mostrarModalFormulario = true;
+    }
+
+    private void AbrirModalEditarAfectacion(FactorAfectacionDto item)
+    {
+        registroEnEdicionId = item.Id;
+        modalErrorMensaje = string.Empty;
+        modeloAfectacion = new UpdateFactorAfectacionDto
+        {
+            Id = item.Id,
+            AnioFiscal = item.AnioFiscal,
+            TipoAfectacion = item.TipoAfectacion,
+            Coeficiente = item.Coeficiente
+        };
+        mostrarModalFormulario = true;
+    }
+
+    private void CerrarModalFormulario()
+    {
+        mostrarModalFormulario = false;
+        registroEnEdicionId = null;
+        modalErrorMensaje = string.Empty;
+    }
+
+    // ==========================================
+    // GUARDADO POR PESTAÑA
+    // ==========================================
+    private async Task GuardarCostoReposicion()
+    {
+        if (modeloCosto.TipoEstructuraId == Guid.Empty)
+        {
+            modalErrorMensaje = "Debe seleccionar un tipo de estructura.";
+            return;
+        }
+
+        await EjecutarGuardadoGenerico(
+            modeloCosto.AnioFiscal,
+            () => registroEnEdicionId.HasValue
+                ? ParametrosService.ActualizarCostoReposicionAsync(registroEnEdicionId.Value, modeloCosto)
+                : ParametrosService.CrearCostoReposicionAsync(modeloCosto),
+            "Costo de reposición guardado correctamente."
+        );
+    }
+
+    private async Task GuardarPrecioSuelo()
+    {
+        await EjecutarGuardadoGenerico(
+            modeloPrecioSuelo.AnioFiscal,
+            () => registroEnEdicionId.HasValue
+                ? ParametrosService.ActualizarPrecioSueloAsync(registroEnEdicionId.Value, modeloPrecioSuelo)
+                : ParametrosService.CrearPrecioSueloAsync(modeloPrecioSuelo),
+            "Precio base de suelo guardado correctamente."
+        );
+    }
+
+    private async Task GuardarFactorDepreciacion()
+    {
+        if (modeloDepreciacion.EstadoConservacionId == Guid.Empty)
+        {
+            modalErrorMensaje = "Debe seleccionar el estado de conservación.";
+            return;
+        }
+        if (modeloDepreciacion.EdadMaxima < modeloDepreciacion.EdadMinima)
+        {
+            modalErrorMensaje = "La edad máxima no puede ser menor a la edad mínima.";
+            return;
+        }
+
+        await EjecutarGuardadoGenerico(
+            modeloDepreciacion.AnioFiscal,
+            () => registroEnEdicionId.HasValue
+                ? ParametrosService.ActualizarFactorDepreciacionAsync(registroEnEdicionId.Value, modeloDepreciacion)
+                : ParametrosService.CrearFactorDepreciacionAsync(modeloDepreciacion),
+            "Factor de depreciación guardado correctamente."
+        );
+    }
+
+    private async Task GuardarFactorAfectacion()
+    {
+        await EjecutarGuardadoGenerico(
+            modeloAfectacion.AnioFiscal,
+            () => registroEnEdicionId.HasValue
+                ? ParametrosService.ActualizarFactorAfectacionAsync(registroEnEdicionId.Value, modeloAfectacion)
+                : ParametrosService.CrearFactorAfectacionAsync(modeloAfectacion),
+            "Factor de afectación guardado correctamente."
+        );
+    }
+
+    private async Task EjecutarGuardadoGenerico(int anioGuardado, Func<Task<OperacionResultadoDto>> accionServicio, string mensajeExitoFallback)
+    {
+        procesandoFormulario = true;
+        modalErrorMensaje = string.Empty;
+
+        try
+        {
+            var resultado = await accionServicio();
+            if (resultado.Exitoso)
+            {
+                anioFiscalGlobal = anioGuardado;
+                CerrarModalFormulario();
+                await CargarDatosTabActivo();
+                await MostrarToast(resultado.Mensaje ?? mensajeExitoFallback, true);
+            }
+            else
+            {
+                modalErrorMensaje = resultado.Mensaje ?? "No se pudo guardar el parámetro.";
+            }
+        }
+        catch (Exception ex)
+        {
+            modalErrorMensaje = $"Error al procesar la solicitud: {ex.Message}";
+        }
+        finally
+        {
+            procesandoFormulario = false;
+        }
+    }
+
+    // ==========================================
+    // CAMBIO DE ESTADO UNIFICADO
+    // ==========================================
+    private void SolicitarCambioEstado(Guid id, string nombre, bool estadoActual)
+    {
+        idEstadoCambiar = id;
+        nombreEstadoCambiar = nombre;
+        estadoActualCambiar = estadoActual;
+    }
+
+    private async Task ConfirmarCambioEstado()
+    {
+        if (!idEstadoCambiar.HasValue) return;
+
+        Guid id = idEstadoCambiar.Value;
+        string nombre = nombreEstadoCambiar;
+        bool estabaActivo = estadoActualCambiar;
+        idEstadoCambiar = null;
+
+        OperacionResultadoDto resultado = tabActivo switch
+        {
+            1 => await ParametrosService.CambiarEstadoCostoReposicionAsync(id),
+            2 => await ParametrosService.CambiarEstadoPrecioSueloAsync(id),
+            3 => await ParametrosService.CambiarEstadoFactorDepreciacionAsync(id),
+            4 => await ParametrosService.CambiarEstadoFactorAfectacionAsync(id),
+            _ => OperacionResultadoDto.Fallo("Pestaña no válida.")
+        };
+
+        if (resultado.Exitoso)
+        {
+            await CargarDatosTabActivo();
+            bool mostrarVerde = !estabaActivo;
+            string msgDefault = mostrarVerde
+                ? $"Parámetro '{nombre}' activado correctamente."
+                : $"Parámetro '{nombre}' desactivado correctamente.";
+
+            await MostrarToast(resultado.Mensaje ?? msgDefault, mostrarVerde);
+        }
+        else
+        {
+            await MostrarToast(resultado.Mensaje ?? "No se pudo cambiar el estado del parámetro.", false);
+        }
+    }
+
+    private async Task MostrarToast(string mensaje, bool esExito = true)
+    {
+        toastCts?.Cancel();
+        toastCts = new CancellationTokenSource();
+        toastMensaje = mensaje;
+        toastEsExito = esExito;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Delay(4000, toastCts.Token);
+            toastMensaje = string.Empty;
+            StateHasChanged();
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private void OcultarToast() => toastMensaje = string.Empty;
+}

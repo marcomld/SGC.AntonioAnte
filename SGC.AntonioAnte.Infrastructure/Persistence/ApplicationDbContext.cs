@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using SGC.AntonioAnte.Application.Common.Interfaces;
+using SGC.AntonioAnte.Domain.Avaluos.Entities;
 using SGC.AntonioAnte.Domain.Catastro.Entities;
 using SGC.AntonioAnte.Domain.Common;
 using SGC.AntonioAnte.Domain.Common.Attributes;
@@ -39,6 +40,13 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
         public DbSet<Predio> Predios => Set<Predio>();
         public DbSet<Dominio> Dominios => Set<Dominio>();
         public DbSet<BloqueConstruccion> BloquesConstruccion => Set<BloqueConstruccion>();
+
+        // Módulo 4: Avalúos
+        public DbSet<PrecioBaseSuelo> PreciosBaseSuelo => Set<PrecioBaseSuelo>();
+        public DbSet<CostoReposicion> CostosReposicion => Set<CostoReposicion>();
+        public DbSet<FactorDepreciacion> FactoresDepreciacion => Set<FactorDepreciacion>();
+        public DbSet<FactorAfectacion> FactoresAfectacion => Set < FactorAfectacion > ();
+        public DbSet<LiquidacionPredial> LiquidacionesPrediales => Set<LiquidacionPredial>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

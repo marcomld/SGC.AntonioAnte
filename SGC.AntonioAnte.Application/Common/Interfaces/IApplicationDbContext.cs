@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SGC.AntonioAnte.Domain.Catastro.Entities;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
+using SGC.AntonioAnte.Domain.Avaluos.Entities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,6 +25,13 @@ namespace SGC.AntonioAnte.Application.Common.Interfaces
         DbSet<Predio> Predios { get; }
         DbSet<Dominio> Dominios { get; }
         DbSet<BloqueConstruccion> BloquesConstruccion { get; }
+
+        // Módulo 4: Avalúos
+        DbSet<PrecioBaseSuelo> PreciosBaseSuelo { get; }
+        DbSet<CostoReposicion> CostosReposicion { get; }
+        DbSet<FactorDepreciacion> FactoresDepreciacion { get; }
+        DbSet<FactorAfectacion> FactoresAfectacion { get; }
+        DbSet<LiquidacionPredial> LiquidacionesPrediales { get; }
 
         Task<int> SaveChangesAsync(CancellationToken cancellationToken);
     }
