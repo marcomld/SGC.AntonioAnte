@@ -22,7 +22,7 @@ namespace SGC.AntonioAnte.API.Controllers.Seguridad
         public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
             // Instanciamos el record posicional en una línea
-            var command = new LoginCommand(dto.Identificacion, dto.Password);
+            var command = new LoginCommand(dto.Identificacion, dto.Password, dto.Recordarme);
 
             var tokens = await _mediator.Send(command);
 

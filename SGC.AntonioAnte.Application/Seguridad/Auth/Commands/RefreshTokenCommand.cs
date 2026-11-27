@@ -5,9 +5,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using SGC.AntonioAnte.Application.Common.Interfaces;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
+using SGC.AntonioAnte.Shared.Constants;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -16,19 +18,16 @@ using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
 {
-    // 1. COMMAND (record posicional inmutable)
+    // 1. COMMAND
     public record RefreshTokenCommand(string AccessToken, string RefreshToken) : IRequest<TokenResponseDto>;
 
-    // 2. VALIDATOR (FluentValidation)
+    // 2. VALIDATOR
     public class RefreshTokenCommandValidator : AbstractValidator<RefreshTokenCommand>
     {
         public RefreshTokenCommandValidator()
         {
-            RuleFor(x => x.AccessToken)
-                .NotEmpty().WithMessage("El token de acceso expirado es obligatorio.");
-
-            RuleFor(x => x.RefreshToken)
-                .NotEmpty().WithMessage("El token de refresco es obligatorio.");
+            RuleFor(x => x.AccessToken).NotEmpty().WithMessage("El token de acceso expirado es obligatorio.");
+            RuleFor(x => x.RefreshToken).NotEmpty().WithMessage("El token de refresco es obligatorio.");
         }
     }
 
@@ -54,12 +53,10 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
 
         public async Task<TokenResponseDto> Handle(RefreshTokenCommand request, CancellationToken cancellationToken)
         {
-            // 1. Extraer el Principal del Token expirado
             var principal = GetPrincipalFromExpiredToken(request.AccessToken);
             if (principal == null) throw new Exception("Access Token inválido.");
 
-            var userIdString = principal.FindFirstValue(ClaimTypes.NameIdentifier)
-                               ?? principal.FindFirstValue("sub");
+            var userIdString = principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub");
             if (!Guid.TryParse(userIdString, out Guid userId))
                 throw new Exception("Token no contiene un ID de usuario válido.");
 
@@ -67,33 +64,36 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
             if (usuario == null || !usuario.EstadoActivo)
                 throw new Exception("Usuario no encontrado o inactivo.");
 
-            // 2. Obtener el RefreshToken de la base de datos (Tabla: UsuarioTokens)
             var storedTokenValue = await _userManager.GetAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken");
             if (string.IsNullOrEmpty(storedTokenValue))
                 throw new Exception("No existe una sesión activa.");
 
-            // Desglosamos formato: "tokenString|fechaExpiracion"
             var parts = storedTokenValue.Split('|');
             if (parts.Length != 2 || parts[0] != request.RefreshToken)
             {
-                await RegistrarAuditoria(usuario.Id, "REFRESH_RECHAZADO", "Token no coincide o está alterado.", cancellationToken);
+                await RegistrarAuditoriaFallida(usuario.Id, "REFRESH_RECHAZADO", "Token no coincide o está alterado.", cancellationToken);
                 throw new Exception("Refresh Token inválido.");
             }
 
-            if (DateTime.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.RoundtripKind).ToUniversalTime() <= DateTime.UtcNow)
+            // 🟢 Parseo Invariante para evitar problemas de huso horario
+            var fechaExpiracionOriginal = DateTime.Parse(parts[1], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToUniversalTime();
+
+            if (fechaExpiracionOriginal <= DateTime.UtcNow)
             {
-                await RegistrarAuditoria(usuario.Id, "REFRESH_RECHAZADO", "Refresh Token expirado.", cancellationToken);
+                await RegistrarAuditoriaFallida(usuario.Id, "REFRESH_RECHAZADO", "Refresh Token expirado.", cancellationToken);
                 throw new Exception("Su sesión ha expirado completamente. Vuelva a iniciar sesión.");
             }
 
-            // 3. Generar nuevos Tokens reconstruyendo claims limpios desde la BD
             var newAccessToken = await GenerarNuevoAccessTokenLimpioAsync(usuario);
             var newRefreshTokenString = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-            var newRefreshTokenValue = $"{newRefreshTokenString}|{DateTime.UtcNow.AddDays(7):O}";
 
-            // 4. Actualizar en la base de datos
+            // 🟢 Expiración Absoluta: Mantenemos la fecha original calculada en el Login (9h o 30d)
+            var newRefreshTokenValue = $"{newRefreshTokenString}|{fechaExpiracionOriginal:O}";
+
             await _userManager.RemoveAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken");
             await _userManager.SetAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken", newRefreshTokenValue);
+
+            // 🟢 No registramos auditoría de éxito para evitar inflar la bitácora con ruido operativo.
 
             return new TokenResponseDto { AccessToken = newAccessToken, RefreshToken = newRefreshTokenString };
         }
@@ -106,7 +106,7 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
                 ValidateIssuer = false,
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JwtSettings:Key"]!)),
-                ValidateLifetime = false // Leemos claims del token expirado
+                ValidateLifetime = false
             };
 
             var tokenHandler = new JwtSecurityTokenHandler();
@@ -152,7 +152,7 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        private async Task RegistrarAuditoria(Guid usuarioId, string accion, string datosAdicionales, CancellationToken cancellationToken)
+        private async Task RegistrarAuditoriaFallida(Guid usuarioId, string accion, string datosAdicionales, CancellationToken cancellationToken)
         {
             _context.Auditorias.Add(new Auditoria
             {

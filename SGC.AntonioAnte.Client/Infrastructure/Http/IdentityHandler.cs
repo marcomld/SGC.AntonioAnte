@@ -42,7 +42,7 @@ namespace SGC.AntonioAnte.Client.Infrastructure.Http
 
             bool esReintento = peticionOriginal.Headers.Contains("X-Is-Retry");
 
-            var tokenActual = await _localStorage.GetItemAsync("authToken");
+            var tokenActual = await _localStorage.GetItemAsync("authToken") ?? await _localStorage.GetSessionItemAsync("authToken");
 
             if (!string.IsNullOrWhiteSpace(tokenActual))
             {
@@ -87,8 +87,8 @@ namespace SGC.AntonioAnte.Client.Infrastructure.Http
             await _semaphore.WaitAsync(cancellationToken);
             try
             {
-                var accessGuardado = await _localStorage.GetItemAsync("authToken");
-                var refreshGuardado = await _localStorage.GetItemAsync("refreshToken");
+                var accessGuardado = await _localStorage.GetItemAsync("authToken") ?? await _localStorage.GetSessionItemAsync("authToken");
+                var refreshGuardado = await _localStorage.GetItemAsync("refreshToken") ?? await _localStorage.GetSessionItemAsync("refreshToken");
 
                 if (!string.IsNullOrWhiteSpace(accessGuardado)) accessGuardado = accessGuardado.Trim('"').Trim();
                 if (!string.IsNullOrWhiteSpace(refreshGuardado)) refreshGuardado = refreshGuardado.Trim('"').Trim();
@@ -149,6 +149,8 @@ namespace SGC.AntonioAnte.Client.Infrastructure.Http
 
                     if (!string.IsNullOrWhiteSpace(nuevoAccessToken) && !string.IsNullOrWhiteSpace(nuevoRefreshToken))
                     {
+                        bool esPersistente = await _localStorage.GetItemAsync("authToken") != null;
+
                         if (_authStateProvider is CustomAuthStateProvider customProvider)
                         {
                             var dto = new TokenResponseDto
@@ -156,14 +158,21 @@ namespace SGC.AntonioAnte.Client.Infrastructure.Http
                                 AccessToken = nuevoAccessToken,
                                 RefreshToken = nuevoRefreshToken
                             };
-                            await customProvider.NotificarLogin(dto);
+                            await customProvider.NotificarLogin(dto, esPersistente);
                         }
                         else
                         {
-                            await _localStorage.SetItemAsync("authToken", nuevoAccessToken);
-                            await _localStorage.SetItemAsync("refreshToken", nuevoRefreshToken);
+                            if (esPersistente)
+                            {
+                                await _localStorage.SetItemAsync("authToken", nuevoAccessToken);
+                                await _localStorage.SetItemAsync("refreshToken", nuevoRefreshToken);
+                            }
+                            else
+                            {
+                                await _localStorage.SetSessionItemAsync("authToken", nuevoAccessToken);
+                                await _localStorage.SetSessionItemAsync("refreshToken", nuevoRefreshToken);
+                            }
                         }
-
                         return true;
                     }
                 }

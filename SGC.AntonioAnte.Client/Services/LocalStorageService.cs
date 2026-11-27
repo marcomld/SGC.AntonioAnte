@@ -26,5 +26,13 @@ namespace SGC.AntonioAnte.Client.Services
         {
             await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", clave);
         }
+        public async Task<string?> GetSessionItemAsync(string clave)
+            => await _jsRuntime.InvokeAsync<string?>("sessionStorage.getItem", clave);
+
+        public async Task SetSessionItemAsync(string clave, string valor)
+            => await _jsRuntime.InvokeVoidAsync("sessionStorage.setItem", clave, valor);
+
+        public async Task RemoveSessionItemAsync(string clave)
+            => await _jsRuntime.InvokeVoidAsync("sessionStorage.removeItem", clave);
     }
 }

@@ -14,5 +14,7 @@ namespace SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth
 
         [Required(ErrorMessage = "La contraseña es obligatoria.")]
         public string Password { get; set; } = string.Empty;
+
+        public bool Recordarme { get; set; }
     }
 }

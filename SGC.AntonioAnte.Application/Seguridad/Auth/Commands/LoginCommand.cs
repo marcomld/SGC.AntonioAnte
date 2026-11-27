@@ -6,8 +6,8 @@ using Microsoft.IdentityModel.Tokens;
 using SGC.AntonioAnte.Application.Common.Exceptions;
 using SGC.AntonioAnte.Application.Common.Interfaces;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
+using SGC.AntonioAnte.Shared.Constants;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
-using SGC.AntonioAnte.Shared.Constants; // 🔹 Importamos nuestras constantes
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
@@ -18,10 +18,10 @@ using System.Threading.Tasks;
 
 namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
 {
-    // 1. COMMAND (El DTO de MediatR)
-    public record LoginCommand(string Identificacion, string Password) : IRequest<TokenResponseDto>;
+    // 1. COMMAND
+    public record LoginCommand(string Identificacion, string Password, bool Recordarme) : IRequest<TokenResponseDto>;
 
-    // 2. VALIDATOR (Reglas de negocio previas a tocar la BD)
+    // 2. VALIDATOR
     public class LoginCommandValidator : AbstractValidator<LoginCommand>
     {
         public LoginCommandValidator()
@@ -34,7 +34,7 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
         }
     }
 
-    // 3. HANDLER (Lógica central)
+    // 3. HANDLER
     public class LoginCommandHandler : IRequestHandler<LoginCommand, TokenResponseDto>
     {
         private readonly UserManager<Usuario> _userManager;
@@ -70,7 +70,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
                 throw new Exception("El usuario se encuentra inactivo en el sistema.");
             }
 
-            // CONTROL DE LOCKOUT EXISTENTE PRE-LOGIN
             if (await _userManager.IsLockedOutAsync(usuario))
             {
                 var fechaFinBloqueo = usuario.LockoutEnd ?? DateTimeOffset.UtcNow;
@@ -80,7 +79,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
                 throw new LoginBloqueadoException(segundosRestantes);
             }
 
-            // VALIDAR CONTRASEÑA CON LOCKOUT ACTIVADO
             if (!await _userManager.CheckPasswordAsync(usuario, request.Password))
             {
                 await _userManager.AccessFailedAsync(usuario);
@@ -100,7 +98,6 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
 
             await _userManager.ResetAccessFailedCountAsync(usuario);
 
-            // --- Generación de Tokens ---
             var roles = await _userManager.GetRolesAsync(usuario);
             var claims = new List<Claim>
             {
@@ -119,6 +116,7 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JwtSettings:Key"]!));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
+            // Access Token de 15 Minutos (Estricto)
             var token = new JwtSecurityToken(
                 issuer: _configuration["JwtSettings:Issuer"],
                 audience: _configuration["JwtSettings:Audience"],
@@ -128,16 +126,19 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
             );
 
             var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
+
             var randomNumber = new byte[32];
             using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
             rng.GetBytes(randomNumber);
             var refreshTokenString = Convert.ToBase64String(randomNumber);
-            var refreshTokenValue = $"{refreshTokenString}|{DateTime.UtcNow.AddDays(7):O}";
+
+            // 🟢 Lógica Híbrida: 30 días persistente, 9 horas volátil (0.375 días)
+            var diasExpiracion = request.Recordarme ? 30 : 0.375;
+            var refreshTokenValue = $"{refreshTokenString}|{DateTime.UtcNow.AddDays(diasExpiracion):O}";
 
             await _userManager.RemoveAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken");
             await _userManager.SetAuthenticationTokenAsync(usuario, "SGC_System", "RefreshToken", refreshTokenValue);
 
-            // Auditoría exitosa estandarizada
             await RegistrarAuditoria(usuario.Id, AuditActions.LoginExitoso, "Usuario", usuario.Id.ToString(), "Generación de Access y Refresh Token", cancellationToken);
 
             return new TokenResponseDto
@@ -156,8 +157,8 @@ namespace SGC.AntonioAnte.Application.Seguridad.Auth.Commands
                 Entidad = entidad,
                 EntidadId = entidadId,
                 DatosAdicionales = datosAdicionales,
-                DireccionIp = _currentUserService.IpAddress, // 🔹 Inyectado seguro
-                Navegador = _currentUserService.UserAgent,   // 🔹 Inyectado seguro
+                DireccionIp = _currentUserService.IpAddress,
+                Navegador = _currentUserService.UserAgent,
                 FechaCreacion = DateTime.UtcNow
             };
             _context.Auditorias.Add(auditoria);

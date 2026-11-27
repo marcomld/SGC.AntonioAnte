@@ -19,7 +19,7 @@ namespace SGC.AntonioAnte.Client.Infrastructure.Security
 
         public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            var tokenGuardado = await _localStorage.GetItemAsync("authToken");
+            var tokenGuardado = await _localStorage.GetItemAsync("authToken") ?? await _localStorage.GetSessionItemAsync("authToken");
 
             if (string.IsNullOrWhiteSpace(tokenGuardado))
             {
@@ -33,10 +33,18 @@ namespace SGC.AntonioAnte.Client.Infrastructure.Security
             return new AuthenticationState(usuarioPrincipal);
         }
 
-        public async Task NotificarLogin(TokenResponseDto tokensRecibidos)
+        public async Task NotificarLogin(TokenResponseDto tokensRecibidos, bool recordarme)
         {
-            await _localStorage.SetItemAsync("authToken", tokensRecibidos.AccessToken);
-            await _localStorage.SetItemAsync("refreshToken", tokensRecibidos.RefreshToken);
+            if (recordarme)
+            {
+                await _localStorage.SetItemAsync("authToken", tokensRecibidos.AccessToken);
+                await _localStorage.SetItemAsync("refreshToken", tokensRecibidos.RefreshToken);
+            }
+            else
+            {
+                await _localStorage.SetSessionItemAsync("authToken", tokensRecibidos.AccessToken);
+                await _localStorage.SetSessionItemAsync("refreshToken", tokensRecibidos.RefreshToken);
+            }
 
             var claimsNuevos = JwtParser.ParseClaimsFromJwt(tokensRecibidos.AccessToken);
             var identidadAutenticada = new ClaimsIdentity(claimsNuevos, "jwt");
@@ -50,6 +58,8 @@ namespace SGC.AntonioAnte.Client.Infrastructure.Security
         {
             await _localStorage.RemoveItemAsync("authToken");
             await _localStorage.RemoveItemAsync("refreshToken");
+            await _localStorage.RemoveSessionItemAsync("authToken");
+            await _localStorage.RemoveSessionItemAsync("refreshToken");
 
             var estadoDesconectado = Task.FromResult(_estadoAnonimo);
             NotifyAuthenticationStateChanged(estadoDesconectado);
