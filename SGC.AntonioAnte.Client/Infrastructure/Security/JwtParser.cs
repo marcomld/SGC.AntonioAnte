@@ -1,7 +1,7 @@
 ﻿using System.Security.Claims;
 using System.Text.Json;
 
-namespace SGC.AntonioAnte.Client.Utils
+namespace SGC.AntonioAnte.Client.Infrastructure.Security
 {
     public class JwtParser
     {

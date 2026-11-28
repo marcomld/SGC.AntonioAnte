@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SGC.AntonioAnte.Application.Common.Interfaces;
+using SGC.AntonioAnte.Application.Seguridad.Auth.Policies;
 using SGC.AntonioAnte.Domain.Seguridad.Entities;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 using System;

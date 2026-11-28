@@ -1,5 +1,4 @@
 ﻿using SGC.AntonioAnte.Client.Services.Seguridad.Contracts;
-using SGC.AntonioAnte.Client.Utils;
 using SGC.AntonioAnte.Shared.DTOs.Common;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 using System.Net;
@@ -120,8 +119,7 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
                 if (respuesta.IsSuccessStatusCode)
                 {
                     var resultadoJson = await respuesta.Content
-                        .ReadFromJsonAsync<
-                            RespuestaApi<ValidarOtpResultadoDto>>(
+                        .ReadFromJsonAsync<RespuestaApi<ValidarOtpResultadoDto>>(
                                 _jsonOptions);
 
                     if (resultadoJson?.Data != null &&

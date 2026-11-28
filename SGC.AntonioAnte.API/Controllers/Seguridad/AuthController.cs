@@ -2,8 +2,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using SGC.AntonioAnte.Application.Seguridad.Auth;
 using SGC.AntonioAnte.Application.Seguridad.Auth.Commands;
+using SGC.AntonioAnte.Application.Seguridad.Auth.Policies;
 using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth;
 using System.Threading.Tasks;
 

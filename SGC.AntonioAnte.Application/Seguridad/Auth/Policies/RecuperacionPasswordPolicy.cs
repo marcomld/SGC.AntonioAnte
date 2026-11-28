@@ -6,7 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SGC.AntonioAnte.Application.Seguridad.Auth
+namespace SGC.AntonioAnte.Application.Seguridad.Auth.Policies
 {
     public static class RecuperacionPasswordPolicy
     {
