@@ -10,14 +10,13 @@ namespace SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth
     public class ResetPasswordDto
     {
         [Required(ErrorMessage = "El correo electrónico es obligatorio.")]
-        [EmailAddress(ErrorMessage = "El formato del correo electrónico no es válido.")]
+        [EmailAddress(ErrorMessage = "Formato de correo inválido.")]
         public string Email { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "El código de verificación (OTP) es obligatorio.")]
-        public string Token { get; set; } = string.Empty;
+        [Required(ErrorMessage = "El token de autorización es obligatorio.")]
+        public string ResetToken { get; set; } = string.Empty;
 
         [Required(ErrorMessage = "La nueva contraseña es obligatoria.")]
-        [MinLength(8, ErrorMessage = "La nueva contraseña debe tener al menos 8 caracteres.")]
         public string NuevaPassword { get; set; } = string.Empty;
     }
 }

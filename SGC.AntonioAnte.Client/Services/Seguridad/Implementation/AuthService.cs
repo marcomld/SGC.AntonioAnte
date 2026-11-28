@@ -88,7 +88,9 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
                 if (respuesta.IsSuccessStatusCode)
                 {
                     resultado.Exitoso = true;
-                    resultado.Mensaje = "Código de verificación (OTP) enviado exitosamente al correo.";
+                    resultado.Mensaje =
+                        "Si el correo está registrado y habilitado, " +
+                        "recibirá un código de recuperación.";
                     return resultado;
                 }
 
@@ -104,7 +106,63 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Implementation
 
             return resultado;
         }
+        public async Task<ValidarOtpResultadoDto> ValidarOtpAsync(
+    ValidarOtpDto codigoDto)
+        {
+            var resultado = new ValidarOtpResultadoDto();
 
+            try
+            {
+                var respuesta = await _httpClient.PostAsJsonAsync(
+                    "api/v1/seguridad/auth/validar-otp",
+                    codigoDto);
+
+                if (respuesta.IsSuccessStatusCode)
+                {
+                    var resultadoJson = await respuesta.Content
+                        .ReadFromJsonAsync<
+                            RespuestaApi<ValidarOtpResultadoDto>>(
+                                _jsonOptions);
+
+                    if (resultadoJson?.Data != null &&
+                        resultadoJson.Data.Exitoso &&
+                        !string.IsNullOrWhiteSpace(
+                            resultadoJson.Data.ResetToken) &&
+                        resultadoJson.Data.ExpiraEnSegundos > 0)
+                    {
+                        resultado.Exitoso = true;
+                        resultado.Mensaje = resultadoJson.Mensaje;
+
+                        resultado.ResetToken =
+                            resultadoJson.Data.ResetToken;
+
+                        resultado.ExpiraEnSegundos =
+                            resultadoJson.Data.ExpiraEnSegundos;
+
+                        return resultado;
+                    }
+
+                    resultado.Mensaje =
+                        "No se recibió una autorización de recuperación válida.";
+
+                    return resultado;
+                }
+
+                var contenidoError =
+                    await respuesta.Content.ReadAsStringAsync();
+
+                resultado.Mensaje = ExtraerMensajeErrorUniversal(
+                    contenidoError,
+                    respuesta.StatusCode);
+            }
+            catch (Exception)
+            {
+                resultado.Mensaje =
+                    "No se pudo establecer comunicación con el servidor.";
+            }
+
+            return resultado;
+        }
         public async Task<OperacionResultadoDto> RestablecerPasswordAsync(ResetPasswordDto restablecerDto)
         {
             var resultado = new OperacionResultadoDto();

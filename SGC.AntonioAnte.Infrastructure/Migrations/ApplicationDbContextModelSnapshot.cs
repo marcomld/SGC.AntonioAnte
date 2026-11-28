@@ -770,6 +770,55 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
                     b.ToTable("Departamentos", "Seguridad");
                 });
 
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Seguridad.Entities.RecuperacionPassword", b =>
+                {
+                    b.Property<Guid>("UsuarioId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CodigoOtpProtegido")
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)");
+
+                    b.Property<DateTime>("FechaExpiracionOtp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaExpiracionResetToken")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("FechaUltimoEnvio")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaUtilizacion")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("FechaValidacionOtp")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("IntentosFallidos")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("ResetTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("UsuarioId");
+
+                    b.ToTable("RecuperacionesPassword", "Seguridad");
+                });
+
             modelBuilder.Entity("SGC.AntonioAnte.Domain.Seguridad.Entities.Rol", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1039,6 +1088,17 @@ namespace SGC.AntonioAnte.Infrastructure.Migrations
                         .WithMany("Auditorias")
                         .HasForeignKey("UsuarioId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("SGC.AntonioAnte.Domain.Seguridad.Entities.RecuperacionPassword", b =>
+                {
+                    b.HasOne("SGC.AntonioAnte.Domain.Seguridad.Entities.Usuario", "Usuario")
+                        .WithOne()
+                        .HasForeignKey("SGC.AntonioAnte.Domain.Seguridad.Entities.RecuperacionPassword", "UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Usuario");
                 });

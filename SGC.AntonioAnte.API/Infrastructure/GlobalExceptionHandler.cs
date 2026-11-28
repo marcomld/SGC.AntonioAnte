@@ -42,9 +42,9 @@ namespace SGC.AntonioAnte.API.Infrastructure
                     .GroupBy(e => e.PropertyName)
                     .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
 
-                // Extraemos el primer mensaje de error para ponerlo como detalle principal
-                var primerMensajeError = validationException.Errors.FirstOrDefault()?.ErrorMessage
-                                         ?? "Uno o más errores de validación ocurrieron.";
+                var primerMensajeError =
+                    validationException.Errors.FirstOrDefault()?.ErrorMessage
+                    ?? validationException.Message;
 
                 var problemDetails = new ValidationProblemDetails(errores)
                 {
@@ -63,7 +63,7 @@ namespace SGC.AntonioAnte.API.Infrastructure
             {
                 Status = StatusCodes.Status500InternalServerError,
                 Title = "Error interno del servidor",
-                Detail = exception.Message
+                Detail = "Ocurrió un error interno del servidor."
             }, cancellationToken);
 
             return true;

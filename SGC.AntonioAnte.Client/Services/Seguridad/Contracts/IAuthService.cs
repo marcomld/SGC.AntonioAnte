@@ -9,5 +9,6 @@ namespace SGC.AntonioAnte.Client.Services.Seguridad.Contracts
         Task LogoutAsync();
         Task<OperacionResultadoDto> SolicitarRecuperacionAsync(ForgotPasswordDto correoDto);
         Task<OperacionResultadoDto> RestablecerPasswordAsync(ResetPasswordDto restablecerDto);
+        Task<ValidarOtpResultadoDto> ValidarOtpAsync(ValidarOtpDto codigoDto);
     }
 }

@@ -16,6 +16,7 @@ namespace SGC.AntonioAnte.Application.Common.Interfaces
         // Módulo 1: Seguridad
         DbSet<Auditoria> Auditorias { get; }
         DbSet<Departamento> Departamentos { get; }
+        DbSet<RecuperacionPassword> RecuperacionesPassword { get; }
 
         // Módulo 2: Catastro
         DbSet<TipoTenencia> TiposTenencia { get; }

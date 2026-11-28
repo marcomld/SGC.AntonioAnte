@@ -31,6 +31,7 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
         // Módulo 1: Seguridad
         public DbSet<Auditoria> Auditorias => Set<Auditoria>();
         public DbSet<Departamento> Departamentos => Set<Departamento>();
+        public DbSet<RecuperacionPassword> RecuperacionesPassword => Set<RecuperacionPassword>();
 
         // Módulo 2: Catastro
         public DbSet<TipoTenencia> TiposTenencia => Set<TipoTenencia>();
@@ -84,8 +85,11 @@ namespace SGC.AntonioAnte.Infrastructure.Persistence
 
             // 🔵 2. INTERCEPTOR DE DELTA TRACKING (Seguridad.Auditorias)
             var entradasRastreadas = ChangeTracker.Entries()
-                .Where(e => (e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted)
+                .Where(e => (e.State == EntityState.Added ||
+                             e.State == EntityState.Modified ||
+                             e.State == EntityState.Deleted)
                             && e.Entity is not Auditoria
+                            && e.Entity is not RecuperacionPassword
                             && !EsTablaInternaIdentity(e.Entity))
                 .ToList();
 
