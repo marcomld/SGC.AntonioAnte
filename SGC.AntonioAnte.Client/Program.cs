@@ -27,6 +27,7 @@ builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthStateProvider>
 // Registro del Servicio de Usuarios (NUEVO)
 builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<PasswordRecoveryState>();
 builder.Services.AddScoped<IDepartamentoService, DepartamentoService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IAuditoriaService, AuditoriaService>();

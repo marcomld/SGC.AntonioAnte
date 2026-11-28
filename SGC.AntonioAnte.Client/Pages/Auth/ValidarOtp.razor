@@ -1,0 +1,309 @@
+﻿@page "/validar-otp"
+@layout AuthLayout
+@using SGC.AntonioAnte.Shared.DTOs.Seguridad.Auth
+@using SGC.AntonioAnte.Client.Services.Seguridad.Contracts
+@using SGC.AntonioAnte.Client.Services.Contracts
+@using SGC.AntonioAnte.Client.Infrastructure.Security
+@implements IDisposable
+@inject NavigationManager Navigation
+@inject ILocalStorageService LocalStorage
+@inject IAuthService AuthService
+@inject PasswordRecoveryState RecoveryState
+
+<div class="d-flex flex-column align-items-center justify-content-center min-vh-100 bg-light-gray px-3">
+    <div class="login-card shadow-lg w-100" style="max-width: 480px;">
+        <div class="card-accent-bar"></div>
+
+        <div class="p-4 p-md-5">
+            <div class="text-center mb-4">
+                <div class="mb-3 d-inline-block p-3 rounded-circle bg-primary bg-opacity-10 text-primary">
+                    <i class="bi bi-shield-lock fs-3"></i>
+                </div>
+                <h3 class="fw-bold text-dark">Validar Código</h3>
+                <p class="text-muted small">Ingresa el código de 6 dígitos enviado al correo:<br /><strong class="text-dark">@Email</strong></p>
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMensaje))
+            {
+                <div class="alert alert-danger border-0 shadow-sm small mb-4 d-flex align-items-center" role="alert" style="background-color: #fce8e8; color: #b91c1c;">
+                    <i class="bi bi-exclamation-triangle-fill me-2 fs-5 text-danger"></i>
+                    <div>@errorMensaje</div>
+                </div>
+            }
+            
+            @if (!string.IsNullOrEmpty(mensajeReenvioExitoso))
+            {
+                <div class="alert alert-success border-0 shadow-sm small mb-4 d-flex align-items-center" role="alert" style="background-color: #f0fdf4; color: #15803d;">
+                    <i class="bi bi-check-circle-fill me-2 fs-5 text-success"></i>
+                    <div>@mensajeReenvioExitoso</div>
+                </div>
+            }
+
+            <div class="mb-4 text-center">
+                <div class="d-flex justify-content-center gap-2 mb-3">
+                    @for (int i = 0; i < 6; i++)
+                    {
+                        var currentIndex = i;
+                        <input @ref="otpInputs[currentIndex]"
+                               type="text"
+                               class="form-control text-center fw-bold fs-4 otp-input shadow-sm"
+                               value="@otpArray[currentIndex]"
+                               @oninput="@(e => HandleOtpInput(e, currentIndex))"
+                               @onkeydown="@(e => HandleOtpKeyDown(e, currentIndex))"
+                               inputmode="numeric"
+                               autocomplete="@(currentIndex == 0 ? "one-time-code" : "off")"
+                               aria-label="@($"Dígito {currentIndex + 1}")"
+                               disabled="@procesando" />
+                    }
+                </div>
+                @if (procesando)
+                {
+                    <div class="small fw-bold mt-2" style="color: var(--brand-accent);">
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span> Validando código con el servidor...
+                    </div>
+                }
+            </div>
+
+            <div class="text-center mt-4 border-top pt-3">
+                <span class="small text-muted me-1">¿No recibiste el código?</span>
+                @if (TemporizadorActivo)
+                {
+                    <span class="small fw-bold text-muted">Reenviar en @FormatearTiempo(reenvioSegundos)</span>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-link p-0 small fw-bold text-decoration-none link-accent" @onclick="ReenviarCodigo" disabled="@procesando">
+                        Reenviar Código Ahora
+                    </button>
+                }
+            </div>
+            
+            <div class="text-center mt-3">
+                <a href="login" class="small text-decoration-none text-muted fw-semibold">Cancelar</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .bg-light-gray {
+        background-color: var(--bg-body, #f8fafc);
+    }
+
+    .login-card {
+        background-color: var(--bg-surface, #ffffff);
+        border-radius: var(--radius-lg, 1rem);
+        border: 1px solid var(--border-color, #e2e8f0);
+    }
+
+    .card-accent-bar {
+        height: 4px;
+        width: 100%;
+        background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
+    }
+
+    .link-accent {
+        color: var(--brand-accent, #2563eb);
+        font-weight: 600;
+    }
+
+    .otp-input {
+        width: 45px;
+        height: 55px;
+        border-radius: 0.5rem;
+        border: 2px solid #e2e8f0;
+        color: #0f172a;
+        transition: border-color 0.2s;
+    }
+
+        .otp-input:focus {
+            border-color: var(--brand-accent, #2563eb);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+</style>
+
+@code {
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public string? Email { get; set; }
+
+    private string errorMensaje = string.Empty;
+    private string mensajeReenvioExitoso = string.Empty;
+    private bool procesando = false;
+    private bool isDisposed = false;
+    private string[] otpArray = new string[6] { "", "", "", "", "", "" };
+    private ElementReference[] otpInputs = new ElementReference[6];
+
+    private const string LLAVE_TIEMPO_RESETEO = "tiempoReenvioCodigo";
+    private int reenvioSegundos = 0;
+    private bool TemporizadorActivo => reenvioSegundos > 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrEmpty(Email))
+        {
+            Navigation.NavigateTo("/recuperar-password");
+            return;
+        }
+
+        var finTemporizadorStr = await LocalStorage.GetItemAsync(LLAVE_TIEMPO_RESETEO);
+        if (!string.IsNullOrEmpty(finTemporizadorStr) && long.TryParse(finTemporizadorStr, out long tiempoExpiracionUnix))
+        {
+            var segundosRestantes = (int)(tiempoExpiracionUnix - DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            if (segundosRestantes > 0)
+            {
+                reenvioSegundos = segundosRestantes;
+                _ = IniciarTemporizador();
+            }
+        }
+    }
+
+    public void Dispose() => isDisposed = true;
+
+    private async Task HandleOtpInput(
+    ChangeEventArgs e,
+    int index)
+    {
+        if (procesando)
+            return;
+
+        var valor = e.Value?.ToString() ?? string.Empty;
+
+        var digitos = new string(
+            valor.Where(c => c >= '0' && c <= '9')
+                 .Take(6)
+                 .ToArray());
+
+        errorMensaje = string.Empty;
+
+        if (digitos.Length == 0)
+        {
+            otpArray[index] = string.Empty;
+            return;
+        }
+
+        // Permite escribir o pegar varios dígitos.
+        for (int i = 0;
+             i < digitos.Length && index + i < 6;
+             i++)
+        {
+            otpArray[index + i] = digitos[i].ToString();
+        }
+
+        if (otpArray.All(x =>
+            x.Length == 1 && x[0] >= '0' && x[0] <= '9'))
+        {
+            await VerificarAutocompletadoAsync();
+            return;
+        }
+
+        var siguiente = Math.Min(index + digitos.Length, 5);
+
+        await otpInputs[siguiente].FocusAsync();
+    }
+
+    private async Task HandleOtpKeyDown(KeyboardEventArgs e, int index)
+    {
+        if (e.Key == "Backspace" && string.IsNullOrEmpty(otpArray[index]) && index > 0)
+        {
+            await otpInputs[index - 1].FocusAsync();
+            otpArray[index - 1] = "";
+            errorMensaje = string.Empty;
+        }
+    }
+
+    private async Task VerificarAutocompletadoAsync()
+    {
+        if (procesando || string.IsNullOrWhiteSpace(Email))
+            return;
+
+        if (!otpArray.All(x =>
+            x.Length == 1 && x[0] >= '0' && x[0] <= '9'))
+        {
+            return;
+        }
+
+        var codigoUnido = string.Join("", otpArray);
+
+        procesando = true;
+        errorMensaje = string.Empty;
+        mensajeReenvioExitoso = string.Empty;
+
+        try
+        {
+            var dto = new ValidarOtpDto
+            {
+                Email = Email,
+                Codigo = codigoUnido
+            };
+
+            var resultado = await AuthService.ValidarOtpAsync(dto);
+
+            if (resultado.Exitoso &&
+                !string.IsNullOrWhiteSpace(resultado.ResetToken))
+            {
+                RecoveryState.Autorizar(
+                    Email,
+                    resultado.ResetToken,
+                    resultado.ExpiraEnSegundos);
+
+                Array.Fill(otpArray, string.Empty);
+
+                Navigation.NavigateTo("/nueva-password");
+
+                return;
+            }
+
+            errorMensaje = resultado.Mensaje;
+
+            Array.Fill(otpArray, string.Empty);
+        }
+        finally
+        {
+            procesando = false;
+        }
+    }
+
+    private async Task IniciarTemporizador()
+    {
+        while (reenvioSegundos > 0 && !isDisposed)
+        {
+            await Task.Delay(1000);
+            if (!isDisposed)
+            {
+                reenvioSegundos--;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private string FormatearTiempo(int segundos) => $"{segundos / 60:D2}:{segundos % 60:D2}";
+
+    private async Task ReenviarCodigo()
+    {
+        procesando = true;
+        errorMensaje = string.Empty;
+        mensajeReenvioExitoso = string.Empty;
+
+        var dtoCorreo = new ForgotPasswordDto { Email = Email! };
+        var resultado = await AuthService.SolicitarRecuperacionAsync(dtoCorreo);
+
+        if (resultado.Exitoso)
+        {
+            mensajeReenvioExitoso = "Se ha enviado un nuevo código seguro a tu correo institucional.";
+            for (int i = 0; i < 6; i++) { otpArray[i] = string.Empty; }
+            await otpInputs[0].FocusAsync();
+
+            reenvioSegundos = 120;
+            var nuevoTiempoUnix = DateTimeOffset.UtcNow.AddSeconds(120).ToUnixTimeSeconds();
+            await LocalStorage.SetItemAsync(LLAVE_TIEMPO_RESETEO, nuevoTiempoUnix.ToString());
+            _ = IniciarTemporizador();
+        }
+        else
+        {
+            errorMensaje = "Error al reenviar el código. Intente más tarde.";
+        }
+        procesando = false;
+    }
+}

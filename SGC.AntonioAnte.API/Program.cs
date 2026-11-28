@@ -6,6 +6,7 @@ using SGC.AntonioAnte.Application.Common.Interfaces;
 using SGC.AntonioAnte.Infrastructure;
 using SGC.AntonioAnte.Infrastructure.Persistence;
 using SGC.AntonioAnte.Infrastructure.Persistence.Seeders; // <-- Importante: Asegura este namespace
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -67,6 +68,39 @@ builder.Services.AddCors(options =>
     });
 });
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode =
+        StatusCodes.Status429TooManyRequests;
+
+    options.AddPolicy("RecuperacionPassword", context =>
+    {
+        var ip = context.Connection.RemoteIpAddress?
+            .ToString() ?? "Desconocida";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            ip,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+    });
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new
+            {
+                Mensaje =
+                    "Demasiadas solicitudes. Intente más tarde."
+            },
+            cancellationToken);
+    };
+});
+
 var app = builder.Build();
 
 // =========================================================================
@@ -107,10 +141,15 @@ if (app.Environment.IsDevelopment())
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
 
-app.UseAuthentication();
 app.UseRouting();
+
 app.UseCors("PoliticaBlazorSGC");
+
+app.UseRateLimiter();
+
+app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 app.Run();

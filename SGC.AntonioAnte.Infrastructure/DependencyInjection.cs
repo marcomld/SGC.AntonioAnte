@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace SGC.AntonioAnte.Infrastructure
 {
@@ -47,6 +48,7 @@ namespace SGC.AntonioAnte.Infrastructure
                 options.Password.RequireDigit = true;
                 options.Password.RequireLowercase = true;
                 options.Password.RequireUppercase = true;
+                options.Password.RequireNonAlphanumeric = true;
                 options.Password.RequiredLength = 8;
                 options.User.RequireUniqueEmail = true;
 
@@ -57,11 +59,20 @@ namespace SGC.AntonioAnte.Infrastructure
                 // =========================================================================
                 // ARQUITECTURA: FORZAR TOKEN DE 6 DÍGITOS PARA RESTABLECER CONTRASEÑA
                 // =========================================================================
-                options.Tokens.PasswordResetTokenProvider = TokenOptions.DefaultEmailProvider;
+                options.Tokens.PasswordResetTokenProvider = TokenOptions.DefaultProvider;
                 // =========================================================================
             })
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
+
+            // Configuración de tokens criptográficos de Identity.
+            services.Configure<DataProtectionTokenProviderOptions>(options =>
+            {
+                options.TokenLifespan = TimeSpan.FromMinutes(10);
+            });
+
+            // Protección criptográfica de los códigos OTP almacenados.
+            services.AddDataProtection();
 
             // 3. Configuración de Autenticación y JWT
             services.AddAuthentication(options =>
